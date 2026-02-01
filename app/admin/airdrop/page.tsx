@@ -1,7 +1,7 @@
 "use client";
 
 import { useWallet } from "@solana/wallet-adapter-react";
-import { useState, useEffect } from "react";
+import { useState, useCallback } from "react";
 import { Connection, Transaction, SystemProgram, PublicKey } from "@solana/web3.js";
 
 const RPC_ENDPOINT = "https://api.mainnet-beta.solana.com"; // Use process.env in prod
@@ -9,42 +9,74 @@ const ADMIN_WALLET = process.env.NEXT_PUBLIC_ADMIN_WALLET;
 
 export default function AirdropPage() {
     const { publicKey, sendTransaction, connected } = useWallet();
-    const [roles, setRoles] = useState<any[]>([]);
-    const [selectedRole, setSelectedRole] = useState("");
     const [eligibleUsers, setEligibleUsers] = useState<any[]>([]);
-    const [loading, setLoading] = useState(false);
     const [status, setStatus] = useState("");
+    const [dragActive, setDragActive] = useState(false);
 
     const [formData, setFormData] = useState({
         amount: "0.01",
         tokenType: "sol", // sol | token
-        mintAddress: ""
     });
 
-    // Fetch Roles on Load
-    useEffect(() => {
-        fetch("/api/admin/discord/roles")
-            .then(res => res.json())
-            .then(data => {
-                if (Array.isArray(data)) setRoles(data);
-            })
-            .catch(err => console.error(err));
+    // Handle Drag Events
+    const handleDrag = useCallback((e: React.DragEvent) => {
+        e.preventDefault();
+        e.stopPropagation();
+        if (e.type === "dragenter" || e.type === "dragover") {
+            setDragActive(true);
+        } else if (e.type === "dragleave") {
+            setDragActive(false);
+        }
     }, []);
 
-    // Fetch Eligible Users when Role Changes
-    useEffect(() => {
-        if (!selectedRole) return;
-        setLoading(true);
-        fetch("/api/admin/discord/members", {
-            method: "POST",
-            body: JSON.stringify({ roleId: selectedRole })
-        })
-            .then(res => res.json())
-            .then(data => {
-                if (data.users) setEligibleUsers(data.users);
-            })
-            .finally(() => setLoading(false));
-    }, [selectedRole]);
+    // Handle Drop
+    const handleDrop = useCallback((e: React.DragEvent) => {
+        e.preventDefault();
+        e.stopPropagation();
+        setDragActive(false);
+
+        if (e.dataTransfer.files && e.dataTransfer.files[0]) {
+            handleFiles(e.dataTransfer.files[0]);
+        }
+    }, []);
+
+    // Handle File Input
+    const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+        e.preventDefault();
+        if (e.target.files && e.target.files[0]) {
+            handleFiles(e.target.files[0]);
+        }
+    };
+
+    const handleFiles = (file: File) => {
+        if (file.type !== "text/plain" && !file.name.endsWith('.txt')) {
+            alert("Please upload a .txt file");
+            return;
+        }
+
+        const reader = new FileReader();
+        reader.onload = (e) => {
+            const text = e.target?.result as string;
+            const lines = text.split(/\r?\n/);
+
+            const validWallets: any[] = [];
+
+            lines.forEach(line => {
+                const clean = line.trim();
+                // Basic Solana address validation (length check 32-44 chars)
+                if (clean.length >= 32 && clean.length <= 44) {
+                    validWallets.push({
+                        wallet: clean,
+                        username: "Imported User"
+                    });
+                }
+            });
+
+            setEligibleUsers(validWallets);
+            setStatus(`Loaded ${validWallets.length} wallets from file.`);
+        };
+        reader.readAsText(file);
+    };
 
     const handleAirdrop = async () => {
         if (!connected || !publicKey) return;
@@ -61,18 +93,21 @@ export default function AirdropPage() {
 
             // Batch limit: Solana tx size is limited. 
             // For simple SOL transfers, we can fit ~20 per tx.
-            // For MVP, lets just take the first 20 or loop (advanced).
-            // Sending to first 20 for now to prevent failures.
+            // For MVP, taking the first 15 to be safe.
             const batch = eligibleUsers.slice(0, 15);
 
             batch.forEach(user => {
-                transaction.add(
-                    SystemProgram.transfer({
-                        fromPubkey: publicKey,
-                        toPubkey: new PublicKey(user.wallet),
-                        lamports: amount * 1_000_000_000 // Convert SOL to Lamports
-                    })
-                );
+                try {
+                    transaction.add(
+                        SystemProgram.transfer({
+                            fromPubkey: publicKey,
+                            toPubkey: new PublicKey(user.wallet),
+                            lamports: Math.floor(amount * 1_000_000_000)
+                        })
+                    );
+                } catch (e) {
+                    console.error("Invalid key in batch:", user.wallet);
+                }
             });
 
             setStatus(`Requesting signature for ${batch.length} transfers...`);
@@ -95,26 +130,40 @@ export default function AirdropPage() {
 
     return (
         <div className="max-w-4xl mx-auto">
-            <h1 className="text-3xl font-bold mb-8">Role-Based Airdrop</h1>
+            <h1 className="text-3xl font-bold mb-8">Multi-Sender Airdrop</h1>
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
                 <div className="space-y-6">
 
-                    {/* 1. Select Role */}
-                    <div className="bg-white/5 p-6 rounded-2xl border border-white/10">
-                        <h3 className="font-bold mb-4">1. Select Target Role</h3>
-                        <select
-                            className="w-full bg-black/40 border border-white/10 rounded-xl px-4 py-3"
-                            onChange={e => setSelectedRole(e.target.value)}
-                            value={selectedRole}
-                        >
-                            <option value="">-- Choose a Role --</option>
-                            {roles.map(role => (
-                                <option key={role.id} value={role.id} style={{ color: role.color ? `#${role.color.toString(16)}` : 'white' }}>
-                                    {role.name}
-                                </option>
-                            ))}
-                        </select>
+                    {/* 1. File Upload */}
+                    <div
+                        className={`p-8 rounded-2xl border-2 border-dashed transition-all cursor-pointer flex flex-col items-center justify-center text-center group
+                        ${dragActive
+                                ? "border-violet-500 bg-violet-600/10"
+                                : "border-white/10 bg-white/5 hover:border-violet-500/50 hover:bg-white/10"
+                            }`}
+                        onDragEnter={handleDrag}
+                        onDragLeave={handleDrag}
+                        onDragOver={handleDrag}
+                        onDrop={handleDrop}
+                        onClick={() => document.getElementById('file-upload')?.click()}
+                    >
+                        <input
+                            id="file-upload"
+                            type="file"
+                            accept=".txt"
+                            className="hidden"
+                            onChange={handleChange}
+                        />
+
+                        <div className="w-16 h-16 rounded-full bg-zinc-800 flex items-center justify-center mb-4 group-hover:scale-110 transition-transform">
+                            <svg className="w-8 h-8 text-violet-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
+                            </svg>
+                        </div>
+                        <h3 className="font-bold text-lg mb-1">Upload Wallet List</h3>
+                        <p className="text-sm text-zinc-500 mb-2">Drag & Drop or Click to Upload</p>
+                        <span className="text-xs font-mono bg-black/40 px-2 py-1 rounded text-zinc-400">.txt files only</span>
                     </div>
 
                     {/* 2. Configure Asset */}
@@ -129,7 +178,6 @@ export default function AirdropPage() {
                                     onChange={e => setFormData({ ...formData, tokenType: e.target.value })}
                                 >
                                     <option value="sol">Native SOL</option>
-                                    {/* SPL Token implementation requires more complex tx building (get ATA etc), sticking to SOL for MVP */}
                                     <option value="token" disabled>SPL Token (Coming Soon)</option>
                                 </select>
                             </div>
@@ -149,46 +197,42 @@ export default function AirdropPage() {
 
                 {/* 3. Preview */}
                 <div className="bg-white/5 p-6 rounded-2xl border border-white/10 h-fit">
-                    <h3 className="font-bold mb-4">Eligible Recipients</h3>
+                    <h3 className="font-bold mb-4">Recipients List</h3>
 
-                    {loading ? (
-                        <div className="text-center py-10 animate-pulse text-zinc-500">Scanning Database...</div>
-                    ) : (
-                        <>
-                            <div className="bg-black/40 rounded-xl p-4 mb-4 max-h-[300px] overflow-y-auto">
-                                {eligibleUsers.length > 0 ? (
-                                    eligibleUsers.map((u, i) => (
-                                        <div key={i} className="flex justify-between text-sm py-1 border-b border-white/5 last:border-0">
-                                            <span className="text-zinc-400">{u.username.slice(0, 10)}</span>
-                                            <span className="font-mono text-zinc-600">{u.wallet.slice(0, 4)}...{u.wallet.slice(-4)}</span>
-                                        </div>
-                                    ))
-                                ) : (
-                                    <p className="text-zinc-500 text-center">Select a role to see users.</p>
-                                )}
+                    <div className="bg-black/40 rounded-xl p-4 mb-4 max-h-[300px] overflow-y-auto min-h-[100px]">
+                        {eligibleUsers.length > 0 ? (
+                            eligibleUsers.map((u, i) => (
+                                <div key={i} className="flex justify-between text-sm py-1 border-b border-white/5 last:border-0">
+                                    <span className="text-zinc-500 text-xs w-6">{i + 1}.</span>
+                                    <span className="font-mono text-zinc-300">{u.wallet}</span>
+                                </div>
+                            ))
+                        ) : (
+                            <div className="h-full flex flex-col items-center justify-center text-zinc-600">
+                                <p>List is empty</p>
                             </div>
+                        )}
+                    </div>
 
-                            <div className="flex justify-between text-sm mb-6">
-                                <span className="text-zinc-400">Total Recipients:</span>
-                                <span className="font-bold text-white">{eligibleUsers.length}</span>
-                            </div>
+                    <div className="flex justify-between text-sm mb-6">
+                        <span className="text-zinc-400">Total Recipients:</span>
+                        <span className="font-bold text-white">{eligibleUsers.length}</span>
+                    </div>
 
-                            <div className="flex justify-between text-sm mb-6">
-                                <span className="text-zinc-400">Total Cost:</span>
-                                <span className="font-bold text-emerald-400">
-                                    {(eligibleUsers.length * parseFloat(formData.amount || "0")).toFixed(4)} SOL
-                                </span>
-                            </div>
+                    <div className="flex justify-between text-sm mb-6">
+                        <span className="text-zinc-400">Total Cost:</span>
+                        <span className="font-bold text-emerald-400">
+                            {(eligibleUsers.length * parseFloat(formData.amount || "0")).toFixed(4)} SOL
+                        </span>
+                    </div>
 
-                            <button
-                                onClick={handleAirdrop}
-                                disabled={!connected || eligibleUsers.length === 0}
-                                className="w-full bg-gradient-to-r from-violet-600 to-fuchsia-600 hover:from-violet-500 hover:to-fuchsia-500 py-4 rounded-xl font-bold transition-all disabled:opacity-50 disabled:cursor-not-allowed"
-                            >
-                                {status || "🚀 Confirm & Send"}
-                            </button>
-                        </>
-                    )}
+                    <button
+                        onClick={handleAirdrop}
+                        disabled={!connected || eligibleUsers.length === 0}
+                        className="w-full bg-gradient-to-r from-violet-600 to-fuchsia-600 hover:from-violet-500 hover:to-fuchsia-500 py-4 rounded-xl font-bold transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                    >
+                        {status || "🚀 Confirm & Send"}
+                    </button>
                 </div>
             </div>
         </div>
