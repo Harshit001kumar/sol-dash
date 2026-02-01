@@ -3,6 +3,7 @@ import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
 import { WalletContextProvider } from "@/components/WalletProvider";
 import ChatWidget from "@/components/ChatWidget";
+import AirdropNotification from "@/components/AirdropNotification";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -32,6 +33,7 @@ export default function RootLayout({
         <WalletContextProvider>
           {children}
           <ChatWidget />
+          <AirdropNotification />
         </WalletContextProvider>
       </body>
     </html>

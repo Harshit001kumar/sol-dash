@@ -77,6 +77,7 @@ export default function AdminLayout({
                     <div className="flex items-center gap-4">
                         <a href="/admin" className="text-sm hover:text-white text-zinc-400 transition-colors">Dashboard</a>
                         <a href="/admin/raffles/create" className="text-sm hover:text-white text-zinc-400 transition-colors">Create Raffle</a>
+                        <a href="/admin/airdrop" className="text-sm hover:text-white text-zinc-400 transition-colors">Airdrop</a>
                         <a href="/" className="text-sm hover:text-white text-zinc-400 transition-colors">Exit</a>
                     </div>
                 </div>
