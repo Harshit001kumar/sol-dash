@@ -3,6 +3,8 @@ import { getDatabase } from "@/lib/mongodb";
 
 const ADMIN_WALLET = process.env.NEXT_PUBLIC_ADMIN_WALLET;
 
+export const dynamic = "force-dynamic";
+
 // Helper to get next ID
 async function getNextSequence(db: any, name: string) {
     const result = await db.collection("counters").findOneAndUpdate(

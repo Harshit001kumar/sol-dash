@@ -4,6 +4,8 @@ import { PublicKey } from "@solana/web3.js";
 import * as nacl from "tweetnacl";
 import bs58 from "bs58";
 
+export const dynamic = "force-dynamic";
+
 // GET: Check if a wallet is verified for a Discord user
 export async function GET(request: NextRequest) {
     const { searchParams } = new URL(request.url);

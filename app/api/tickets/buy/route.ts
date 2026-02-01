@@ -5,6 +5,8 @@ import { ObjectId } from "mongodb";
 
 const SOLANA_RPC = "https://api.mainnet-beta.solana.com";
 
+export const dynamic = "force-dynamic";
+
 // POST: Verify and record a ticket purchase
 export async function POST(request: NextRequest) {
     try {
