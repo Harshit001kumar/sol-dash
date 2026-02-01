@@ -138,6 +138,10 @@ export default function Home() {
                 <span className="font-bold text-xl tracking-tight">SOL Raffle</span>
                 <span className="hidden sm:inline-block ml-2 text-xs font-medium text-zinc-500 bg-zinc-800/50 px-2 py-0.5 rounded-full">BETA</span>
               </div>
+
+              <a href="/profile" className="text-sm font-medium text-zinc-400 hover:text-white transition-colors">
+                Profile
+              </a>
             </div>
 
             <a
