@@ -147,7 +147,7 @@ export default function ProfilePage() {
                                 <>
                                     <h1 className="text-4xl font-black mb-2">{profile.username || "Anonymous User"}</h1>
                                     <p className="font-mono text-zinc-500 text-sm mb-4 bg-black/30 inline-block px-3 py-1 rounded-lg">
-                                        {publicKey.toBase58()}
+                                        {publicKey?.toBase58()}
                                     </p>
                                     <div className="flex gap-2 justify-center md:justify-start">
                                         <button
