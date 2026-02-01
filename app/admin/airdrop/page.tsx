@@ -2,9 +2,9 @@
 
 import { useWallet } from "@solana/wallet-adapter-react";
 import { useState, useCallback } from "react";
-import { Connection, Transaction, SystemProgram, PublicKey } from "@solana/web3.js";
+import { Connection, Transaction, SystemProgram, PublicKey, clusterApiUrl } from "@solana/web3.js";
 
-const RPC_ENDPOINT = "https://api.mainnet-beta.solana.com"; // Use process.env in prod
+const RPC_ENDPOINT = process.env.NEXT_PUBLIC_RPC_ENDPOINT || clusterApiUrl('mainnet-beta');
 const ADMIN_WALLET = process.env.NEXT_PUBLIC_ADMIN_WALLET;
 
 export default function AirdropPage() {
