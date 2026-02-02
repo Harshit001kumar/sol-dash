@@ -175,11 +175,35 @@ export default function AirdropPage() {
                 // Wait up to 60s likely, but if it fails we catch it
                 await connection.confirmTransaction(sig, 'confirmed');
                 setStatus(`Success! Sent to ${batch.length} users.`);
+                
+                // Trigger Discord Webhook (Fire and Forget)
+                fetch("/api/admin/airdrop/notify", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({
+                        amount: formData.amount,
+                        tokenType: formData.tokenType,
+                        recipientCount: batch.length,
+                        signature: sig
+                    })
+                });
+
             } catch (confirmErr) {
                 console.warn("Confirmation timeout:", confirmErr);
                 // It likely succeeded but timed out waiting for confirmation
                 setStatus("Timeout: Transaction sent! Check Explorer.");
-                // We don't throw here, we treat it as "likely success" for UX, but warn
+                
+                // Still try to notify discord if it was a timeout (likely succeeded)
+                fetch("/api/admin/airdrop/notify", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({
+                        amount: formData.amount,
+                        tokenType: formData.tokenType,
+                        recipientCount: batch.length,
+                        signature: sig
+                    })
+                });
             }
             
             // Add Explorer Link

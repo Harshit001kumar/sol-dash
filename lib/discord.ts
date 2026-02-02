@@ -51,3 +51,19 @@ export async function sendRaffleEndedWebhook(raffle: any, winnerWallet: string, 
     };
     await sendDiscordWebhook(embed);
 }
+
+export async function sendAirdropWebhook(amount: string, tokenType: string, recipientCount: number, signature: string) {
+    const embed = {
+        title: "🚀 Airdrop Sent!",
+        description: `An airdrop has been successfully distributed.`,
+        color: 0x3b82f6, // Blue
+        fields: [
+            { name: "💰 Amount", value: `${amount} ${tokenType.toUpperCase()}`, inline: true },
+            { name: "👥 Recipients", value: `${recipientCount} Users`, inline: true },
+            { name: "🔗 Transaction", value: `[View on Solscan](https://solscan.io/tx/${signature})`, inline: false }
+        ],
+        footer: { text: "Solana Airdrop System" },
+        timestamp: new Date().toISOString()
+    };
+    await sendDiscordWebhook(embed);
+}
