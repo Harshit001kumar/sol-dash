@@ -1,13 +1,48 @@
 "use client";
 
+import { useWallet } from "@solana/wallet-adapter-react";
 import { useEffect, useState } from "react";
 
 export default function AdminDashboard() {
     const [stats, setStats] = useState<any>(null);
+    const [pendingRaffles, setPendingRaffles] = useState<any[]>([]);
+    const { publicKey } = useWallet();
 
     useEffect(() => {
+        // Fetch Stats
         fetch("/api/raffles").then(res => res.json()).then(data => setStats(data.stats));
+
+        // Fetch Pending Raffles
+        fetch("/api/admin/raffles?filter=pending_winner")
+            .then(res => res.json())
+            .then(data => {
+                if (data.raffles) setPendingRaffles(data.raffles);
+            });
     }, []);
+
+    const handlePickWinner = async (raffleId: number) => {
+        if (!confirm("Are you sure you want to pick a winner? This cannot be undone.")) return;
+
+        try {
+            const res = await fetch(`/api/admin/raffles/${raffleId}/winner`, {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ wallet: publicKey?.toBase58() })
+            });
+            const data = await res.json();
+
+            if (res.ok) {
+                alert(`Winner Picked: ${data.winner.name} (${data.winner.wallet.slice(0, 4)}...${data.winner.wallet.slice(-4)})`);
+                // Remove from list
+                setPendingRaffles(prev => prev.filter(r => r.id !== raffleId));
+            } else {
+                alert("Error: " + data.error);
+            }
+        } catch (e) {
+            console.error(e);
+            alert("Failed to pick winner");
+        }
+    };
 
     return (
         <div>
@@ -34,6 +69,29 @@ export default function AdminDashboard() {
                     </p>
                 </div>
             </div>
+
+            {/* Pending Winner Section */}
+            {pendingRaffles.length > 0 && (
+                <div className="mb-12">
+                    <h2 className="text-xl font-bold mb-4 text-amber-400">⚠️ Ended Raffles - Needs Winner</h2>
+                    <div className="grid grid-cols-1 gap-4">
+                        {pendingRaffles.map(raffle => (
+                            <div key={raffle.id} className="bg-white/5 border border-amber-500/30 p-4 rounded-xl flex items-center justify-between">
+                                <div>
+                                    <h3 className="font-bold">{raffle.prize_name}</h3>
+                                    <p className="text-sm text-zinc-500">Ended: {new Date(raffle.end_time).toLocaleDateString()}</p>
+                                </div>
+                                <button
+                                    onClick={() => handlePickWinner(raffle.id)}
+                                    className="px-4 py-2 bg-amber-500 hover:bg-amber-600 text-black font-bold rounded-lg transition-colors"
+                                >
+                                    🎲 Pick Winner
+                                </button>
+                            </div>
+                        ))}
+                    </div>
+                </div>
+            )}
 
             <div className="flex items-center justify-between mb-6">
                 <h2 className="text-xl font-bold">Quick Actions</h2>

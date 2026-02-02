@@ -69,3 +69,37 @@ export async function POST(request: NextRequest) {
         return NextResponse.json({ error: "Failed to create raffle" }, { status: 500 });
     }
 }
+
+export async function GET(request: NextRequest) {
+    const { searchParams } = new URL(request.url);
+    const filter = searchParams.get("filter"); // 'pending_winner', 'active', etc.
+
+    try {
+        const db = await getDatabase();
+
+        let query: any = {};
+
+        if (filter === "pending_winner") {
+            // Raffles that are ended OR expired but have no winner
+            const now = new Date();
+            query = {
+                $or: [
+                    { status: "ended" },
+                    { end_time: { $lte: now } }
+                ],
+                winner_wallet: null // No winner yet
+            };
+        } else {
+            // Default to all or separate logic if needed
+            // For now only fulfilling the specific need
+            return NextResponse.json({ raffles: [] });
+        }
+
+        const raffles = await db.collection("raffles").find(query).sort({ end_time: -1 }).toArray();
+
+        return NextResponse.json({ raffles });
+
+    } catch (error) {
+        return NextResponse.json({ error: "Fetch failed" }, { status: 500 });
+    }
+}
