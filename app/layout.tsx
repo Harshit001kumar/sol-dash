@@ -4,6 +4,7 @@ import "./globals.css";
 import { WalletContextProvider } from "@/components/WalletProvider";
 import ChatWidget from "@/components/ChatWidget";
 import AirdropNotification from "@/components/AirdropNotification";
+import { Analytics } from "@vercel/analytics/next";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -35,6 +36,7 @@ export default function RootLayout({
           <ChatWidget />
           <AirdropNotification />
         </WalletContextProvider>
+        <Analytics />
       </body>
     </html>
   );
