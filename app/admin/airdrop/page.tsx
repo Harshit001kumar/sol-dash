@@ -3,13 +3,18 @@
 import { useWallet } from "@solana/wallet-adapter-react";
 import { useState, useCallback } from "react";
 import { Connection, Transaction, SystemProgram, PublicKey, clusterApiUrl } from "@solana/web3.js";
+import {
+    createAssociatedTokenAccountInstruction,
+    getAssociatedTokenAddress,
+    createTransferInstruction,
+    getMint
+} from "@solana/spl-token";
 
 // List of fallbacks to try
 const FALLBACK_RPCS = [
     process.env.NEXT_PUBLIC_RPC_ENDPOINT,
-    clusterApiUrl('mainnet-beta'),
-    "https://api.mainnet-beta.solana.com",
-    "https://solana-mainnet.g.alchemy.com/v2/demo",
+    clusterApiUrl('devnet'), // Default to devnet now
+    "https://api.devnet.solana.com",
 ].filter(Boolean) as string[];
 
 const ADMIN_WALLET = process.env.NEXT_PUBLIC_ADMIN_WALLET;
@@ -24,59 +29,25 @@ export default function AirdropPage() {
     const [customRpc, setCustomRpc] = useState("");
 
     const [formData, setFormData] = useState({
-        amount: "0.01",
+        amount: "0.1",
         tokenType: "sol", // sol | token
+        mintAddress: ""
     });
 
-    // Helper to get connection with fallback or custom
+    // Helper to get connection
     const getConnection = async () => {
         if (customRpc) return new Connection(customRpc);
-
         for (const rpc of FALLBACK_RPCS) {
             try {
                 const connection = new Connection(rpc);
-                // Simple check to see if it responds
                 await connection.getLatestBlockhash();
-                console.log("Connected to RPC:", rpc);
                 return connection;
-            } catch (e) {
-                console.warn("RPC failed:", rpc);
-                continue;
-            }
+            } catch (e) { continue; }
         }
-        throw new Error("All RPC endpoints failed. Please provide a custom RPC.");
+        throw new Error("All RPC endpoints failed.");
     };
 
-    // Handle Drag Events
-    const handleDrag = useCallback((e: React.DragEvent) => {
-        e.preventDefault();
-        e.stopPropagation();
-        if (e.type === "dragenter" || e.type === "dragover") {
-            setDragActive(true);
-        } else if (e.type === "dragleave") {
-            setDragActive(false);
-        }
-    }, []);
-
-    // Handle Drop
-    const handleDrop = useCallback((e: React.DragEvent) => {
-        e.preventDefault();
-        e.stopPropagation();
-        setDragActive(false);
-
-        if (e.dataTransfer.files && e.dataTransfer.files[0]) {
-            handleFiles(e.dataTransfer.files[0]);
-        }
-    }, []);
-
-    // Handle File Input
-    const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-        e.preventDefault();
-        if (e.target.files && e.target.files[0]) {
-            handleFiles(e.target.files[0]);
-        }
-    };
-
+    // Handle File Processing (same as before)
     const handleFiles = (file: File) => {
         if (file.type !== "text/plain" && !file.name.endsWith('.txt')) {
             alert("Please upload a .txt file");
@@ -87,31 +58,40 @@ export default function AirdropPage() {
         reader.onload = (e) => {
             const text = e.target?.result as string;
             const lines = text.split(/\r?\n/);
-
             const validWallets: any[] = [];
-
             lines.forEach(line => {
                 const clean = line.trim();
-                // Basic Solana address validation (length check 32-44 chars)
                 if (clean.length >= 32 && clean.length <= 44) {
-                    validWallets.push({
-                        wallet: clean,
-                        username: "Imported User"
-                    });
+                    validWallets.push({ wallet: clean });
                 }
             });
-
             setEligibleUsers(validWallets);
-            setStatus(`Loaded ${validWallets.length} wallets from file.`);
+            setStatus(`Loaded ${validWallets.length} wallets.`);
         };
         reader.readAsText(file);
+    };
+
+    const handleDrag = useCallback((e: React.DragEvent) => {
+        e.preventDefault(); e.stopPropagation();
+        if (e.type === "dragenter" || e.type === "dragover") setDragActive(true);
+        else if (e.type === "dragleave") setDragActive(false);
+    }, []);
+
+    const handleDrop = useCallback((e: React.DragEvent) => {
+        e.preventDefault(); e.stopPropagation(); setDragActive(false);
+        if (e.dataTransfer.files && e.dataTransfer.files[0]) handleFiles(e.dataTransfer.files[0]);
+    }, []);
+
+    const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+        e.preventDefault();
+        if (e.target.files && e.target.files[0]) handleFiles(e.target.files[0]);
     };
 
     const handleAirdrop = async () => {
         if (!connected || !publicKey) return;
         if (eligibleUsers.length === 0) return alert("No eligible users!");
 
-        setStatus("Finding working RPC...");
+        setStatus("Finding RPC...");
 
         try {
             const connection = await getConnection();
@@ -119,32 +99,77 @@ export default function AirdropPage() {
             const amount = parseFloat(formData.amount);
             if (isNaN(amount) || amount <= 0) return alert("Invalid amount");
 
-            // Batch limit checking
-            const batch = eligibleUsers.slice(0, 15);
+            // Batching (Limit 10 for Token logic due to higher compute unit usage)
+            const batch = eligibleUsers.slice(0, 10);
             const transaction = new Transaction();
 
-            batch.forEach(user => {
-                try {
-                    transaction.add(
-                        SystemProgram.transfer({
-                            fromPubkey: publicKey,
-                            toPubkey: new PublicKey(user.wallet),
-                            lamports: Math.floor(amount * 1_000_000_000)
-                        })
-                    );
-                } catch (e) {
-                    console.error("Invalid key in batch:", user.wallet);
+            if (formData.tokenType === "sol") {
+                batch.forEach(user => {
+                    try {
+                        transaction.add(
+                            SystemProgram.transfer({
+                                fromPubkey: publicKey,
+                                toPubkey: new PublicKey(user.wallet),
+                                lamports: Math.floor(amount * 1_000_000_000)
+                            })
+                        );
+                    } catch (e) {
+                        console.error("Invalid key:", user.wallet);
+                    }
+                });
+            } else {
+                // SPL Token Logic
+                if (!formData.mintAddress) return alert("Mint Address Required");
+
+                setStatus("Fetching Token Info...");
+                const mintPubkey = new PublicKey(formData.mintAddress);
+                const mintInfo = await getMint(connection, mintPubkey);
+                const decimals = mintInfo.decimals;
+                const tokenAmount = Math.floor(amount * Math.pow(10, decimals));
+
+                for (const user of batch) {
+                    try {
+                        const recipientPubkey = new PublicKey(user.wallet);
+
+                        // Get ATA addresses
+                        const recipientATA = await getAssociatedTokenAddress(mintPubkey, recipientPubkey);
+                        const senderATA = await getAssociatedTokenAddress(mintPubkey, publicKey);
+
+                        // Check if recipient has ATA, if not create one (Cost: 0.002 SOL, paid by sender)
+                        const accountInfo = await connection.getAccountInfo(recipientATA);
+                        if (!accountInfo) {
+                            transaction.add(
+                                createAssociatedTokenAccountInstruction(
+                                    publicKey, // Payer
+                                    recipientATA,
+                                    recipientPubkey,
+                                    mintPubkey
+                                )
+                            );
+                        }
+
+                        // Transfer instruction
+                        transaction.add(
+                            createTransferInstruction(
+                                senderATA,
+                                recipientATA,
+                                publicKey, // Owner
+                                tokenAmount
+                            )
+                        );
+                    } catch (e) {
+                        console.error("Token setup failed for one user:", e);
+                    }
                 }
-            });
+            }
 
-            setStatus(`Requesting signature for ${batch.length} transfers...`);
-
+            setStatus(`Requesting signature...`);
             const sig = await sendTransaction(transaction, connection);
 
             setStatus("Confirming...");
             await connection.confirmTransaction(sig);
 
-            setStatus(`Success! Sent to ${batch.length} users. Sig: ${sig.slice(0, 8)}...`);
+            setStatus(`Success! Sent to ${batch.length} users.`);
         } catch (err) {
             console.error(err);
             setStatus("Failed: " + (err as Error).message);
@@ -159,9 +184,8 @@ export default function AirdropPage() {
         <div className="max-w-4xl mx-auto">
             <h1 className="text-3xl font-bold mb-8">Multi-Sender Airdrop</h1>
 
-            {/* Custom RPC Input for Emergency */}
+            {/* Custom RPC Input */}
             <div className="bg-amber-500/10 border border-amber-500/20 p-4 rounded-xl mb-6">
-                <p className="text-amber-200 text-sm mb-2">Public RPCs (api.mainnet-beta) are often blocked. If you see "403 Forbidden", enter a custom RPC below.</p>
                 <input
                     type="text"
                     placeholder="Enter Custom RPC URL (optional)"
@@ -173,41 +197,22 @@ export default function AirdropPage() {
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
                 <div className="space-y-6">
-
-                    {/* 1. File Upload */}
+                    {/* File Upload */}
                     <div
                         className={`p-8 rounded-2xl border-2 border-dashed transition-all cursor-pointer flex flex-col items-center justify-center text-center group
-                        ${dragActive
-                                ? "border-violet-500 bg-violet-600/10"
-                                : "border-white/10 bg-white/5 hover:border-violet-500/50 hover:bg-white/10"
-                            }`}
-                        onDragEnter={handleDrag}
-                        onDragLeave={handleDrag}
-                        onDragOver={handleDrag}
-                        onDrop={handleDrop}
+                        ${dragActive ? "border-violet-500 bg-violet-600/10" : "border-white/10 bg-white/5"}`}
+                        onDragEnter={handleDrag} onDragLeave={handleDrag} onDragOver={handleDrag} onDrop={handleDrop}
                         onClick={() => document.getElementById('file-upload')?.click()}
                     >
-                        <input
-                            id="file-upload"
-                            type="file"
-                            accept=".txt"
-                            className="hidden"
-                            onChange={handleChange}
-                        />
-
-                        <div className="w-16 h-16 rounded-full bg-zinc-800 flex items-center justify-center mb-4 group-hover:scale-110 transition-transform">
-                            <svg className="w-8 h-8 text-violet-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
-                            </svg>
-                        </div>
+                        <input id="file-upload" type="file" accept=".txt" className="hidden" onChange={handleChange} />
+                        <div className="w-16 h-16 rounded-full bg-zinc-800 flex items-center justify-center mb-4">📂</div>
                         <h3 className="font-bold text-lg mb-1">Upload Wallet List</h3>
-                        <p className="text-sm text-zinc-500 mb-2">Drag & Drop or Click to Upload</p>
-                        <span className="text-xs font-mono bg-black/40 px-2 py-1 rounded text-zinc-400">.txt files only</span>
+                        <p className="text-sm text-zinc-500 text-center">Drag & Drop or Click (.txt)</p>
                     </div>
 
-                    {/* 2. Configure Asset */}
+                    {/* Configure Asset */}
                     <div className="bg-white/5 p-6 rounded-2xl border border-white/10">
-                        <h3 className="font-bold mb-4">2. Configure Airdrop</h3>
+                        <h3 className="font-bold mb-4">2. Configure</h3>
                         <div className="space-y-4">
                             <div>
                                 <label className="text-xs text-zinc-500">Asset Type</label>
@@ -217,9 +222,23 @@ export default function AirdropPage() {
                                     onChange={e => setFormData({ ...formData, tokenType: e.target.value })}
                                 >
                                     <option value="sol">Native SOL</option>
-                                    <option value="token" disabled>SPL Token (Coming Soon)</option>
+                                    <option value="token">SPL Token</option>
                                 </select>
                             </div>
+
+                            {formData.tokenType === "token" && (
+                                <div>
+                                    <label className="text-xs text-zinc-500">Token Mint Address</label>
+                                    <input
+                                        type="text"
+                                        placeholder="e.g. EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v"
+                                        className="w-full bg-black/40 border border-white/10 rounded-xl px-4 py-3 mt-1 font-mono text-sm"
+                                        value={formData.mintAddress}
+                                        onChange={e => setFormData({ ...formData, mintAddress: e.target.value })}
+                                    />
+                                </div>
+                            )}
+
                             <div>
                                 <label className="text-xs text-zinc-500">Amount Per User</label>
                                 <input
@@ -231,44 +250,24 @@ export default function AirdropPage() {
                             </div>
                         </div>
                     </div>
-
                 </div>
 
-                {/* 3. Preview */}
+                {/* Preview */}
                 <div className="bg-white/5 p-6 rounded-2xl border border-white/10 h-fit">
-                    <h3 className="font-bold mb-4">Recipients List</h3>
-
+                    <h3 className="font-bold mb-4">Recipients ({eligibleUsers.length})</h3>
                     <div className="bg-black/40 rounded-xl p-4 mb-4 max-h-[300px] overflow-y-auto min-h-[100px]">
-                        {eligibleUsers.length > 0 ? (
-                            eligibleUsers.map((u, i) => (
-                                <div key={i} className="flex justify-between text-sm py-1 border-b border-white/5 last:border-0">
-                                    <span className="text-zinc-500 text-xs w-6">{i + 1}.</span>
-                                    <span className="font-mono text-zinc-300">{u.wallet}</span>
-                                </div>
-                            ))
-                        ) : (
-                            <div className="h-full flex flex-col items-center justify-center text-zinc-600">
-                                <p>List is empty</p>
+                        {eligibleUsers.map((u, i) => (
+                            <div key={i} className="flex justify-between text-sm py-1 border-b border-white/5">
+                                <span className="text-zinc-500 text-xs w-6">{i + 1}.</span>
+                                <span className="font-mono text-zinc-300">{u.wallet.slice(0, 20)}...</span>
                             </div>
-                        )}
-                    </div>
-
-                    <div className="flex justify-between text-sm mb-6">
-                        <span className="text-zinc-400">Total Recipients:</span>
-                        <span className="font-bold text-white">{eligibleUsers.length}</span>
-                    </div>
-
-                    <div className="flex justify-between text-sm mb-6">
-                        <span className="text-zinc-400">Total Cost:</span>
-                        <span className="font-bold text-emerald-400">
-                            {(eligibleUsers.length * parseFloat(formData.amount || "0")).toFixed(4)} SOL
-                        </span>
+                        ))}
                     </div>
 
                     <button
                         onClick={handleAirdrop}
                         disabled={!connected || eligibleUsers.length === 0}
-                        className="w-full bg-gradient-to-r from-violet-600 to-fuchsia-600 hover:from-violet-500 hover:to-fuchsia-500 py-4 rounded-xl font-bold transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                        className="w-full bg-gradient-to-r from-violet-600 to-fuchsia-600 hover:opacity-90 py-4 rounded-xl font-bold disabled:opacity-50"
                     >
                         {status || "🚀 Confirm & Send"}
                     </button>
