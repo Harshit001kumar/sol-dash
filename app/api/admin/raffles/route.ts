@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getDatabase } from "@/lib/mongodb";
+import { sendRaffleCreatedWebhook } from "@/lib/discord";
 
 const ADMIN_WALLET = process.env.NEXT_PUBLIC_ADMIN_WALLET;
 
@@ -57,6 +58,9 @@ export async function POST(request: NextRequest) {
         };
 
         await db.collection("raffles").insertOne(newRaffle);
+
+        // Send Discord Notification
+        await sendRaffleCreatedWebhook(newRaffle);
 
         return NextResponse.json({ success: true, raffle: newRaffle });
 
