@@ -3,7 +3,7 @@ import { getDatabase } from "@/lib/mongodb";
 import { Connection, PublicKey } from "@solana/web3.js";
 import { ObjectId } from "mongodb";
 
-const SOLANA_RPC = process.env.NEXT_PUBLIC_RPC_ENDPOINT || "https://api.devnet.solana.com";
+const SOLANA_RPC = process.env.NEXT_PUBLIC_RPC_ENDPOINT || "https://api.mainnet-beta.solana.com";
 
 export const dynamic = "force-dynamic";
 
