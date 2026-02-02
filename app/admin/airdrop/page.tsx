@@ -15,7 +15,7 @@ const FALLBACK_RPCS = [
   process.env.NEXT_PUBLIC_RPC_ENDPOINT,
   "https://rpc.ankr.com/solana",
   "https://solana-mainnet.g.alchemy.com/v2/demo",
-  "https://api.tatum.io/v3/blockchain/node/solana-mainnet",
+  // "https://api.tatum.io/v3/blockchain/node/solana-mainnet", // Rate limited
   clusterApiUrl('mainnet-beta'),
   "https://api.mainnet-beta.solana.com",
 ].filter(Boolean) as string[];
