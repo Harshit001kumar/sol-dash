@@ -6,9 +6,49 @@ import { useState, useEffect, use } from "react";
 import { Connection, PublicKey, Transaction, SystemProgram, LAMPORTS_PER_SOL } from "@solana/web3.js";
 import { useRouter } from "next/navigation";
 
-// Use public RPC for frontend
-const RPC_ENDPOINT = "https://api.mainnet-beta.solana.com";
+// Use fallback logic
+const FALLBACK_RPCS = [
+    process.env.NEXT_PUBLIC_RPC_ENDPOINT,
+    "https://rpc.ankr.com/solana",
+    "https://solana-mainnet.g.alchemy.com/v2/demo",
+    "https://api.tatum.io/v3/blockchain/node/solana-mainnet",
+    "https://api.mainnet-beta.solana.com",
+].filter(Boolean) as string[];
+
 const TREASURY_ADDRESS = process.env.NEXT_PUBLIC_TREASURY_ADDRESS;
+
+// ... (Rest of imports and code)
+
+    // Helper to find working connection
+    const getConnection = async () => {
+        for (const rpc of FALLBACK_RPCS) {
+            try {
+                const connection = new Connection(rpc);
+                await connection.getLatestBlockhash("confirmed");
+                return connection;
+            } catch (e) {
+                console.warn(`RPC ${rpc} failed, trying next...`);
+            }
+        }
+        throw new Error("All RPC endpoints are busy/blocked. Please try again later.");
+    };
+
+    const handleBuy = async () => {
+        if (!connected || !publicKey) return;
+        if (!discordId) {
+            router.push("/verify");
+            return;
+        }
+        if (!raffle || !TREASURY_ADDRESS) return;
+
+        setStatus("buying");
+        setMsg("Finding best network connection...");
+
+        try {
+            // Find working RPC
+            const connection = await getConnection();
+            
+            const totalCost = raffle.ticket_price * quantity;
 
 interface Raffle {
     id: number;
@@ -65,10 +105,12 @@ export default function RafflePage({ params }: { params: Promise<{ id: string }>
         if (!raffle || !TREASURY_ADDRESS) return;
 
         setStatus("buying");
-        setMsg("Initiating transaction...");
+        setMsg("Finding best network connection...");
 
         try {
-            const connection = new Connection(RPC_ENDPOINT);
+            // Find working RPC
+            const connection = await getConnection();
+            
             const totalCost = raffle.ticket_price * quantity;
 
             const transaction = new Transaction().add(
