@@ -170,12 +170,25 @@ export default function AirdropPage() {
             const sig = await sendTransaction(transaction, connection);
 
             setStatus("Confirming...");
-            await connection.confirmTransaction(sig);
+            
+            try {
+                // Wait up to 60s likely, but if it fails we catch it
+                await connection.confirmTransaction(sig, 'confirmed');
+                setStatus(`Success! Sent to ${batch.length} users.`);
+            } catch (confirmErr) {
+                console.warn("Confirmation timeout:", confirmErr);
+                // It likely succeeded but timed out waiting for confirmation
+                setStatus("Timeout: Transaction sent! Check Explorer.");
+                // We don't throw here, we treat it as "likely success" for UX, but warn
+            }
+            
+            // Add Explorer Link
+            const explorerUrl = `https://solscan.io/tx/${sig}${process.env.NEXT_PUBLIC_RPC_ENDPOINT?.includes('devnet') ? '?cluster=devnet' : ''}`;
+            alert(`Transaction sent! If it says "Timeout", check here:\n${explorerUrl}`);
 
-            setStatus(`Success! Sent to ${batch.length} users.`);
-        } catch (err) {
+        } catch (err: any) {
             console.error(err);
-            setStatus("Failed: " + (err as Error).message);
+            setStatus("Failed: " + (err.message || err));
         }
     };
 

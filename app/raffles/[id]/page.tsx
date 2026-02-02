@@ -39,6 +39,7 @@ export default function RafflePage({ params }: { params: Promise<{ id: string }>
     const [quantity, setQuantity] = useState(1);
     const [status, setStatus] = useState<"idle" | "verifying" | "buying" | "success" | "error">("idle");
     const [msg, setMsg] = useState("");
+    const [lastTx, setLastTx] = useState("");
 
     // Fetch Raffle & User Info
     useEffect(() => {
@@ -103,13 +104,20 @@ export default function RafflePage({ params }: { params: Promise<{ id: string }>
             );
 
             const signature = await sendTransaction(transaction, connection);
+            setLastTx(signature);
             setMsg("Transaction sent! Confirming...");
 
             // Wait for confirmation
-            const confirmation = await connection.confirmTransaction(signature, "confirmed");
-
-            if (confirmation.value.err) {
-                throw new Error("Transaction failed");
+            try {
+                const confirmation = await connection.confirmTransaction(signature, "confirmed");
+                if (confirmation.value.err) throw new Error("Transaction failed on-chain");
+            } catch (confirmErr: any) {
+                console.warn("Confirmation warning:", confirmErr);
+                if (confirmErr.toString().includes("30.00 seconds")) {
+                    setMsg("Timeout waiting for confirmation. Checking API...");
+                } else {
+                    throw confirmErr;
+                }
             }
 
             setMsg("Recording tickets...");
@@ -132,7 +140,6 @@ export default function RafflePage({ params }: { params: Promise<{ id: string }>
             if (res.ok) {
                 setStatus("success");
                 setMsg(`Success! You bought ${quantity} tickets!`);
-                // Refresh raffle data
                 setRaffle(prev => prev ? { ...prev, total_tickets: prev.total_tickets + quantity } : null);
             } else {
                 throw new Error(data.error);
@@ -244,6 +251,19 @@ export default function RafflePage({ params }: { params: Promise<{ id: string }>
                             {msg && (
                                 <div className={`mt-4 text-center text-sm ${status === 'error' ? 'text-red-400' : 'text-emerald-400'}`}>
                                     {msg}
+                                </div>
+                            )}
+
+                            {status === 'error' && lastTx && (
+                                <div className="mt-2 text-center">
+                                    <a 
+                                        href={`https://solscan.io/tx/${lastTx}${process.env.NEXT_PUBLIC_RPC_ENDPOINT?.includes('devnet') ? '?cluster=devnet' : ''}`}
+                                        target="_blank"
+                                        rel="noreferrer"
+                                        className="text-xs text-violet-400 hover:text-violet-300 underline"
+                                    >
+                                        Check Transaction on Solscan
+                                    </a>
                                 </div>
                             )}
                         </div>
