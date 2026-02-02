@@ -12,9 +12,12 @@ import {
 
 // List of fallbacks to try
 const FALLBACK_RPCS = [
-    process.env.NEXT_PUBLIC_RPC_ENDPOINT,
-    clusterApiUrl('devnet'), // Default to devnet now
-    "https://api.devnet.solana.com",
+  process.env.NEXT_PUBLIC_RPC_ENDPOINT,
+  "https://rpc.ankr.com/solana",
+  "https://solana-mainnet.g.alchemy.com/v2/demo",
+  "https://api.tatum.io/v3/blockchain/node/solana-mainnet",
+  clusterApiUrl('mainnet-beta'),
+  "https://api.mainnet-beta.solana.com",
 ].filter(Boolean) as string[];
 
 const ADMIN_WALLET = process.env.NEXT_PUBLIC_ADMIN_WALLET;
