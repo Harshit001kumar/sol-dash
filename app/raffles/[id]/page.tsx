@@ -17,39 +17,6 @@ const FALLBACK_RPCS = [
 
 const TREASURY_ADDRESS = process.env.NEXT_PUBLIC_TREASURY_ADDRESS;
 
-// ... (Rest of imports and code)
-
-    // Helper to find working connection
-    const getConnection = async () => {
-        for (const rpc of FALLBACK_RPCS) {
-            try {
-                const connection = new Connection(rpc);
-                await connection.getLatestBlockhash("confirmed");
-                return connection;
-            } catch (e) {
-                console.warn(`RPC ${rpc} failed, trying next...`);
-            }
-        }
-        throw new Error("All RPC endpoints are busy/blocked. Please try again later.");
-    };
-
-    const handleBuy = async () => {
-        if (!connected || !publicKey) return;
-        if (!discordId) {
-            router.push("/verify");
-            return;
-        }
-        if (!raffle || !TREASURY_ADDRESS) return;
-
-        setStatus("buying");
-        setMsg("Finding best network connection...");
-
-        try {
-            // Find working RPC
-            const connection = await getConnection();
-            
-            const totalCost = raffle.ticket_price * quantity;
-
 interface Raffle {
     id: number;
     prize_name: string;
@@ -95,6 +62,20 @@ export default function RafflePage({ params }: { params: Promise<{ id: string }>
                 });
         }
     }, [resolvedParams.id, connected, publicKey]);
+
+    // Helper to find working connection
+    const getConnection = async () => {
+        for (const rpc of FALLBACK_RPCS) {
+            try {
+                const connection = new Connection(rpc);
+                await connection.getLatestBlockhash("confirmed");
+                return connection;
+            } catch (e) {
+                console.warn(`RPC ${rpc} failed, trying next...`);
+            }
+        }
+        throw new Error("All RPC endpoints are busy/blocked. Please try again later.");
+    };
 
     const handleBuy = async () => {
         if (!connected || !publicKey) return;
