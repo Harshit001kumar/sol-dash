@@ -4,7 +4,14 @@ import { useWallet } from "@solana/wallet-adapter-react";
 import { useState, useCallback } from "react";
 import { Connection, Transaction, SystemProgram, PublicKey, clusterApiUrl } from "@solana/web3.js";
 
-const RPC_ENDPOINT = process.env.NEXT_PUBLIC_RPC_ENDPOINT || clusterApiUrl('mainnet-beta');
+// List of fallbacks to try
+const FALLBACK_RPCS = [
+    process.env.NEXT_PUBLIC_RPC_ENDPOINT,
+    clusterApiUrl('mainnet-beta'),
+    "https://api.mainnet-beta.solana.com",
+    "https://solana-mainnet.g.alchemy.com/v2/demo",
+].filter(Boolean) as string[];
+
 const ADMIN_WALLET = process.env.NEXT_PUBLIC_ADMIN_WALLET;
 
 export default function AirdropPage() {
@@ -13,10 +20,32 @@ export default function AirdropPage() {
     const [status, setStatus] = useState("");
     const [dragActive, setDragActive] = useState(false);
 
+    // Allow user to manual override RPC
+    const [customRpc, setCustomRpc] = useState("");
+
     const [formData, setFormData] = useState({
         amount: "0.01",
         tokenType: "sol", // sol | token
     });
+
+    // Helper to get connection with fallback or custom
+    const getConnection = async () => {
+        if (customRpc) return new Connection(customRpc);
+
+        for (const rpc of FALLBACK_RPCS) {
+            try {
+                const connection = new Connection(rpc);
+                // Simple check to see if it responds
+                await connection.getLatestBlockhash();
+                console.log("Connected to RPC:", rpc);
+                return connection;
+            } catch (e) {
+                console.warn("RPC failed:", rpc);
+                continue;
+            }
+        }
+        throw new Error("All RPC endpoints failed. Please provide a custom RPC.");
+    };
 
     // Handle Drag Events
     const handleDrag = useCallback((e: React.DragEvent) => {
@@ -82,19 +111,17 @@ export default function AirdropPage() {
         if (!connected || !publicKey) return;
         if (eligibleUsers.length === 0) return alert("No eligible users!");
 
-        setStatus("Preparing Transaction...");
+        setStatus("Finding working RPC...");
 
         try {
-            const connection = new Connection(RPC_ENDPOINT);
-            const transaction = new Transaction();
+            const connection = await getConnection();
 
             const amount = parseFloat(formData.amount);
             if (isNaN(amount) || amount <= 0) return alert("Invalid amount");
 
-            // Batch limit: Solana tx size is limited. 
-            // For simple SOL transfers, we can fit ~20 per tx.
-            // For MVP, taking the first 15 to be safe.
+            // Batch limit checking
             const batch = eligibleUsers.slice(0, 15);
+            const transaction = new Transaction();
 
             batch.forEach(user => {
                 try {
@@ -131,6 +158,18 @@ export default function AirdropPage() {
     return (
         <div className="max-w-4xl mx-auto">
             <h1 className="text-3xl font-bold mb-8">Multi-Sender Airdrop</h1>
+
+            {/* Custom RPC Input for Emergency */}
+            <div className="bg-amber-500/10 border border-amber-500/20 p-4 rounded-xl mb-6">
+                <p className="text-amber-200 text-sm mb-2">Public RPCs (api.mainnet-beta) are often blocked. If you see "403 Forbidden", enter a custom RPC below.</p>
+                <input
+                    type="text"
+                    placeholder="Enter Custom RPC URL (optional)"
+                    className="w-full bg-black/40 border border-white/10 rounded-lg px-3 py-2 text-sm text-white"
+                    value={customRpc}
+                    onChange={e => setCustomRpc(e.target.value)}
+                />
+            </div>
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
                 <div className="space-y-6">
