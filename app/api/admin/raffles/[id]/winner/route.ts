@@ -22,20 +22,34 @@ export async function POST(
         const db = await getDatabase();
 
         // 1. Get the raffle
-        // id in DB is Int64 (number), but params.id is string. Need to parse.
         const raffleId = parseInt(id);
-        const raffle = await db.collection("raffles").findOne({ id: raffleId });
+        if (isNaN(raffleId)) {
+            return NextResponse.json({ error: "Invalid Raffle ID" }, { status: 400 });
+        }
+
+        // Robust query: Check for both number and string ID (handles legacy data)
+        const raffle = await db.collection("raffles").findOne({ 
+            id: { $in: [raffleId, id] } 
+        });
 
         if (!raffle) {
+            console.error(`Raffle not found: ${id}`);
             return NextResponse.json({ error: "Raffle not found" }, { status: 404 });
         }
 
+        console.log(`Picking winner for Raffle: ${raffleId} (Found: ${raffle.id})`);
+
         if (raffle.winner_id || raffle.winner_wallet) {
+            console.warn("Winner already picked for:", raffleId);
             return NextResponse.json({ error: "Winner already picked" }, { status: 400 });
         }
 
-        // 2. Get all tickets for this raffle
-        const tickets = await db.collection("tickets").find({ raffle_id: raffleId }).toArray();
+        // 2. Get all tickets for this raffle (Robust match)
+        const tickets = await db.collection("tickets").find({ 
+            raffle_id: { $in: [raffleId, id] } 
+        }).toArray();
+
+        console.log(`Found ${tickets.length} tickets for raffle ${raffleId}`);
 
         if (tickets.length === 0) {
             return NextResponse.json({ error: "No tickets sold" }, { status: 400 });
@@ -97,8 +111,8 @@ export async function POST(
             }
         });
 
-    } catch (error) {
-        console.error("Pick winner error:", error);
-        return NextResponse.json({ error: "Failed to pick winner" }, { status: 500 });
+    } catch (error: any) {
+        console.error("Pick winner error:", error, error.stack);
+        return NextResponse.json({ error: "Failed to pick winner: " + error.message }, { status: 500 });
     }
 }
