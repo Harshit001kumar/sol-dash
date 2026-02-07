@@ -13,7 +13,6 @@ body {
 
 /* Custom Animations */
 @keyframes float {
-
   0%,
   100% {
     transform: translateY(0px) rotate(0deg);
@@ -25,7 +24,6 @@ body {
 }
 
 @keyframes float-slow {
-
   0%,
   100% {
     transform: translateY(0px);
@@ -37,7 +35,6 @@ body {
 }
 
 @keyframes pulse-glow {
-
   0%,
   100% {
     opacity: 0.4;
@@ -147,7 +144,12 @@ body {
 }
 
 .animate-shimmer {
-  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.1), transparent);
+  background: linear-gradient(
+    90deg,
+    transparent,
+    rgba(255, 255, 255, 0.1),
+    transparent
+  );
   background-size: 200% 100%;
   animation: shimmer 2s infinite;
 }
@@ -237,7 +239,47 @@ body {
   display: none;
 }
 
-.no-scrollbar {
-  -ms-overflow-style: none;
-  scrollbar-width: none;
+/* Nebula Background */
+.nebula-bg {
+  background-color: #050507;
+  background-image:
+    radial-gradient(
+      circle at 50% 0%,
+      rgba(76, 29, 149, 0.15) 0%,
+      transparent 50%
+    ),
+    radial-gradient(
+      circle at 0% 50%,
+      rgba(59, 130, 246, 0.1) 0%,
+      transparent 50%
+    ),
+    radial-gradient(
+      circle at 100% 50%,
+      rgba(219, 39, 119, 0.1) 0%,
+      transparent 50%
+    );
+  background-attachment: fixed;
+}
+
+/* Marquee Animation */
+@keyframes marquee {
+  0% {
+    transform: translateX(0);
+  }
+  100% {
+    transform: translateX(-50%);
+  }
+}
+
+.animate-marquee {
+  animation: marquee 30s linear infinite;
+}
+
+/* Stronger Glass */
+.glass-heavy {
+  background: rgba(255, 255, 255, 0.03);
+  backdrop-filter: blur(40px);
+  -webkit-backdrop-filter: blur(40px);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.37);
 }

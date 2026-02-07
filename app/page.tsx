@@ -1,6 +1,8 @@
 "use client";
 
 import { useEffect, useState, useRef } from "react";
+import LiveTicker from "@/components/LiveTicker";
+import { WalletMultiButton } from "@solana/wallet-adapter-react-ui";
 
 interface Raffle {
   id: number;
@@ -57,7 +59,7 @@ function AnimatedCounter({ value, duration = 2000 }: { value: number; duration?:
 function FloatingOrb({ className, delay = 0 }: { className?: string; delay?: number }) {
   return (
     <div
-      className={`absolute rounded-full blur-3xl opacity-30 animate-float ${className}`}
+      className={`absolute rounded-full blur-[100px] opacity-20 animate-float ${className}`}
       style={{ animationDelay: `${delay}s` }}
     />
   );
@@ -85,177 +87,146 @@ export default function Home() {
     return (
       <div className="min-h-screen bg-[#050507] flex items-center justify-center">
         <div className="flex flex-col items-center gap-6">
-          <div className="relative">
-            <div className="w-16 h-16 border-4 border-violet-500/20 rounded-full" />
-            <div className="absolute inset-0 w-16 h-16 border-4 border-transparent border-t-violet-500 rounded-full animate-spin" />
-            <div className="absolute inset-2 w-12 h-12 border-4 border-transparent border-t-fuchsia-500 rounded-full animate-spin" style={{ animationDirection: 'reverse', animationDuration: '1.5s' }} />
-          </div>
-          <p className="text-zinc-600 text-sm tracking-widest uppercase">Loading</p>
+            <div className="relative w-24 h-24">
+                <div className="absolute inset-0 border-t-4 border-violet-500 rounded-full animate-spin"></div>
+                <div className="absolute inset-4 border-t-4 border-fuchsia-500 rounded-full animate-spin" style={{ animationDirection: 'reverse' }}></div>
+            </div>
+          <p className="text-violet-400 text-sm tracking-[0.5em] uppercase animate-pulse">Initializing</p>
         </div>
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-[#050507] text-white overflow-hidden">
-      {/* Animated Background */}
-      <div className="fixed inset-0 pointer-events-none">
-        {/* Grid Pattern */}
-        <div
-          className="absolute inset-0 opacity-[0.02]"
-          style={{
-            backgroundImage: `linear-gradient(rgba(255,255,255,.1) 1px, transparent 1px),
-                              linear-gradient(90deg, rgba(255,255,255,.1) 1px, transparent 1px)`,
-            backgroundSize: '100px 100px'
-          }}
-        />
-
-        {/* Floating Orbs */}
-        <FloatingOrb className="w-[600px] h-[600px] bg-violet-600 top-[-200px] left-[-100px]" delay={0} />
-        <FloatingOrb className="w-[500px] h-[500px] bg-fuchsia-600 bottom-[-100px] right-[-100px]" delay={2} />
-        <FloatingOrb className="w-[300px] h-[300px] bg-cyan-600 top-[40%] right-[20%]" delay={4} />
-
-        {/* Animated Rings */}
-        <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[800px] h-[800px] opacity-10">
-          <div className="absolute inset-0 border border-violet-500/50 rounded-full animate-spin-slow" />
-          <div className="absolute inset-12 border border-fuchsia-500/30 rounded-full animate-spin-slow" style={{ animationDirection: 'reverse' }} />
-          <div className="absolute inset-24 border border-cyan-500/20 rounded-full animate-spin-slow" style={{ animationDuration: '40s' }} />
-        </div>
+    <div className="min-h-screen nebula-bg text-white overflow-x-hidden font-sans selection:bg-violet-500/30">
+      
+      {/* Background Elements */}
+      <div className="fixed inset-0 pointer-events-none z-0">
+        <div className="absolute inset-0 bg-[url('/grid.svg')] opacity-[0.03]" />
+        <FloatingOrb className="w-[800px] h-[800px] bg-violet-900/40 top-[-20%] left-[-20%]" delay={0} />
+        <FloatingOrb className="w-[600px] h-[600px] bg-fuchsia-900/40 bottom-[-10%] right-[-10%]" delay={2} />
       </div>
 
       {/* Navigation */}
-      <nav className={`relative z-20 border-b border-white/5 backdrop-blur-xl ${mounted ? 'animate-slide-up' : 'opacity-0'}`}>
-        <div className="max-w-7xl mx-auto px-6 py-5">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-4">
-              <div className="relative group">
-                <div className="absolute inset-0 bg-gradient-to-r from-violet-600 to-fuchsia-600 rounded-xl blur-lg opacity-50 group-hover:opacity-80 transition-opacity" />
-                <div className="relative w-11 h-11 bg-gradient-to-br from-violet-500 to-fuchsia-600 rounded-xl flex items-center justify-center shadow-2xl">
-                  <span className="text-xl font-bold">◎</span>
+      <nav className={`fixed top-0 left-0 right-0 z-50 glass-heavy transition-all duration-700 ${mounted ? 'translate-y-0 opacity-100' : '-translate-y-full opacity-0'}`}>
+        <div className="max-w-7xl mx-auto px-6 h-20 flex items-center justify-between">
+            <div className="flex items-center gap-3 group cursor-pointer">
+                <div className="relative w-10 h-10 flex items-center justify-center bg-gradient-to-br from-violet-600 to-fuchsia-600 rounded-xl shadow-lg shadow-violet-500/20 group-hover:shadow-violet-500/40 transition-shadow">
+                    <span className="text-xl font-bold text-white">◎</span>
                 </div>
-              </div>
-              <div>
-                <span className="font-bold text-xl tracking-tight">SOL Raffle</span>
-                <span className="hidden sm:inline-block ml-2 text-xs font-medium text-zinc-500 bg-zinc-800/50 px-2 py-0.5 rounded-full">BETA</span>
-              </div>
-
-              <a href="/profile" className="text-sm font-medium text-zinc-400 hover:text-white transition-colors">
-                Profile
-              </a>
+                <span className="font-bold text-xl tracking-tight text-white group-hover:text-violet-200 transition-colors">SOL Raffle</span>
             </div>
 
-            <a
-              href="/verify"
-              className="group relative overflow-hidden bg-gradient-to-r from-violet-600 to-fuchsia-600 p-[1px] rounded-xl"
-            >
-              <div className="relative bg-[#0a0a0f] hover:bg-transparent px-5 py-2.5 rounded-xl transition-colors duration-300 flex items-center gap-2">
-                <svg className="w-4 h-4 text-violet-400 group-hover:text-white transition-colors" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
-                </svg>
-                <span className="font-semibold text-sm group-hover:text-white transition-colors">Verify Wallet</span>
-              </div>
-            </a>
-          </div>
+            <div className="flex items-center gap-6">
+                <a href="/profile" className="hidden md:block text-sm font-medium text-zinc-400 hover:text-white transition-colors relative hover:after:content-[''] hover:after:absolute hover:after:-bottom-1 hover:after:left-0 hover:after:w-full hover:after:h-px hover:after:bg-violet-500">
+                    Profile
+                </a>
+                
+                {/* Replaced manual verify button with standard wallet button for robustness */}
+                <WalletMultiButton className="!bg-gradient-to-r !from-violet-600 !to-fuchsia-600 hover:!from-violet-500 hover:!to-fuchsia-500 !rounded-xl !h-[42px] !font-bold !text-sm !px-6 transition-all" />
+            </div>
         </div>
+        
+        {/* Live Ticker Component */}
+        <LiveTicker />
       </nav>
 
-      {/* Hero Section */}
-      <section className={`relative z-10 max-w-7xl mx-auto px-6 pt-20 pb-16 ${mounted ? 'animate-fade-in' : 'opacity-0'}`} style={{ animationDelay: '0.2s' }}>
-        <div className="text-center max-w-3xl mx-auto">
-          <div className="inline-flex items-center gap-2 text-xs font-medium text-violet-400 bg-violet-500/10 border border-violet-500/20 px-4 py-2 rounded-full mb-8 animate-pulse-glow">
-            <span className="w-2 h-2 bg-emerald-400 rounded-full animate-pulse" />
-            Live on Solana Mainnet
-          </div>
-
-          <h1 className="text-5xl md:text-7xl font-black tracking-tight mb-6">
-            <span className="gradient-text animate-gradient bg-gradient-to-r from-violet-400 via-fuchsia-400 to-cyan-400">Win Big</span>
-            <br />
-            <span className="text-white">with SOL Raffles</span>
-          </h1>
-
-          <p className="text-lg text-zinc-400 max-w-xl mx-auto leading-relaxed">
-            The most trusted raffle platform on Solana. Fair, transparent, and fully on-chain.
-          </p>
-        </div>
-      </section>
-
-      {/* Stats Section */}
-      {stats && (
-        <section className={`relative z-10 max-w-7xl mx-auto px-6 pb-16 ${mounted ? 'animate-slide-up' : 'opacity-0'}`} style={{ animationDelay: '0.4s' }}>
-          <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-            {[
-              { value: stats.activeRaffles, label: "Live Raffles", color: "violet", icon: "🎯" },
-              { value: stats.totalUsers, label: "Total Users", color: "fuchsia", icon: "👥" },
-              { value: stats.totalTickets, label: "Tickets Sold", color: "cyan", icon: "🎫" },
-              { value: stats.totalRevenue, label: "Volume (SOL)", color: "emerald", icon: "◎", isDecimal: true },
-            ].map((stat, i) => (
-              <div
-                key={stat.label}
-                className="group relative glass rounded-2xl p-6 card-hover"
-                style={{ animationDelay: `${0.5 + i * 0.1}s` }}
-              >
-                <div className={`absolute inset-0 bg-gradient-to-br from-${stat.color}-500/10 to-transparent rounded-2xl opacity-0 group-hover:opacity-100 transition-opacity`} />
-                <div className="relative">
-                  <span className="text-2xl mb-3 block">{stat.icon}</span>
-                  <p className="text-4xl font-black tracking-tight mb-1">
-                    {stat.isDecimal ? (
-                      <>{stats.totalRevenue.toFixed(1)}</>
-                    ) : (
-                      <AnimatedCounter value={stat.value} />
-                    )}
-                  </p>
-                  <p className="text-zinc-500 text-sm">{stat.label}</p>
+      <main className="relative z-10 pt-40 pb-20 px-6">
+        
+        {/* Hero Section */}
+        <section className={`max-w-7xl mx-auto mb-32 flex flex-col md:flex-row items-center gap-12 ${mounted ? 'animate-fade-in' : 'opacity-0'}`}>
+            <div className="flex-1 text-center md:text-left">
+                <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full border border-emerald-500/30 bg-emerald-500/10 text-emerald-400 text-xs font-bold tracking-wider uppercase mb-8 animate-slide-up" style={{animationDelay: '0.1s'}}>
+                    <span className="w-2 h-2 bg-emerald-400 rounded-full animate-pulse shadow-[0_0_10px_#34d399]" />
+                    Live on Solana Mainnet
                 </div>
-              </div>
-            ))}
-          </div>
+                
+                <h1 className="text-5xl md:text-8xl font-black tracking-tighter leading-[0.9] mb-8 animate-slide-up" style={{animationDelay: '0.2s'}}>
+                    WIN BIG <br />
+                    <span className="text-transparent bg-clip-text bg-gradient-to-r from-violet-400 via-fuchsia-400 to-white animate-gradient">METAVERSE</span>
+                </h1>
+
+                <p className="text-lg text-zinc-400 max-w-xl mx-auto md:mx-0 leading-relaxed mb-10 animate-slide-up" style={{animationDelay: '0.3s'}}>
+                    The most transparent, on-chain raffle platform. Join thousands of winners securing blue-chip NFTs and SOL prizes daily.
+                </p>
+
+                <div className="flex flex-col sm:flex-row items-center gap-4 animate-slide-up" style={{animationDelay: '0.4s'}}>
+                    <button onClick={() => window.scrollTo({ top: 800, behavior: 'smooth' })} className="w-full sm:w-auto px-8 py-4 bg-white text-black font-bold rounded-xl hover:scale-105 transition-transform shadow-[0_0_30px_rgba(255,255,255,0.3)]">
+                        Explore Raffles
+                    </button>
+                    <a href="/winners" className="w-full sm:w-auto px-8 py-4 glass text-white font-bold rounded-xl hover:bg-white/10 transition-colors text-center">
+                        View Winners
+                    </a>
+                </div>
+            </div>
+
+            {/* 3D Coin Visual */}
+            <div className="flex-1 relative h-[500px] w-full flex items-center justify-center animate-float-slow">
+                <div className="relative w-80 h-80 rounded-full bg-gradient-to-br from-violet-600 to-fuchsia-600 shadow-[0_0_100px_rgba(124,58,237,0.5)] flex items-center justify-center border-4 border-white/20 backdrop-blur-md">
+                    <span className="text-9xl font-black text-white drop-shadow-xl filter">◎</span>
+                    <div className="absolute inset-0 rounded-full border border-white/30 animate-spin-slow"></div>
+                    <div className="absolute inset-[-20px] rounded-full border border-violet-500/30 animate-spin-slow" style={{animationDirection: 'reverse'}}></div>
+                </div>
+            </div>
         </section>
-      )}
 
-      {/* Active Raffles Section */}
-      <section className={`relative z-10 max-w-7xl mx-auto px-6 pb-20 ${mounted ? 'animate-slide-up' : 'opacity-0'}`} style={{ animationDelay: '0.6s' }}>
-        <div className="flex items-end justify-between mb-8">
-          <div>
-            <h2 className="text-3xl font-bold tracking-tight mb-2">Active Raffles</h2>
-            <p className="text-zinc-500">Enter now for a chance to win</p>
-          </div>
-          {raffles.length > 0 && (
-            <div className="flex items-center gap-2 text-sm">
-              <span className="w-2 h-2 bg-emerald-400 rounded-full animate-pulse" />
-              <span className="text-zinc-400">{raffles.length} live now</span>
-            </div>
-          )}
-        </div>
-
-        {raffles.length === 0 ? (
-          <div className="glass rounded-3xl p-16 text-center">
-            <div className="w-20 h-20 bg-zinc-800/50 rounded-3xl flex items-center justify-center mx-auto mb-6 animate-float">
-              <span className="text-4xl">🎰</span>
-            </div>
-            <h3 className="text-xl font-bold mb-2">No Active Raffles</h3>
-            <p className="text-zinc-500 max-w-sm mx-auto">Check back soon for exciting new raffles and prizes!</p>
-          </div>
-        ) : (
-          <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {raffles.map((raffle, i) => (
-              <RaffleCard key={raffle.id} raffle={raffle} index={i} />
-            ))}
-          </div>
+        {/* Stats Grid */}
+        {stats && (
+            <section className={`max-w-7xl mx-auto mb-32 grid grid-cols-2 md:grid-cols-4 gap-4 animate-slide-up`} style={{animationDelay: '0.5s'}}>
+                {[
+                  { value: stats.activeRaffles, label: "Live Raffles", color: "text-violet-400" },
+                  { value: stats.totalUsers, label: "Total Users", color: "text-fuchsia-400" },
+                  { value: stats.totalTickets, label: "Tickets Sold", color: "text-cyan-400" },
+                  { value: stats.totalRevenue, label: "SOL Volume", color: "text-emerald-400", isDecimal: true },
+                ].map((stat, i) => (
+                    <div key={i} className="glass rounded-2xl p-6 text-center hover:bg-white/5 transition-colors group">
+                        <p className={`text-4xl font-black ${stat.color} mb-2 group-hover:scale-110 transition-transform`}>
+                            {stat.isDecimal ? stats.totalRevenue.toFixed(1) : <AnimatedCounter value={stat.value} />}
+                        </p>
+                        <p className="text-zinc-500 text-sm font-medium uppercase tracking-wider">{stat.label}</p>
+                    </div>
+                ))}
+            </section>
         )}
-      </section>
 
-      {/* Footer */}
-      <footer className="relative z-10 border-t border-white/5 mt-10">
-        <div className="max-w-7xl mx-auto px-6 py-10">
-          <div className="flex flex-col md:flex-row items-center justify-between gap-4">
-            <div className="flex items-center gap-3">
-              <div className="w-8 h-8 bg-gradient-to-br from-violet-500 to-fuchsia-600 rounded-lg flex items-center justify-center">
-                <span className="text-sm font-bold">◎</span>
-              </div>
-              <span className="font-semibold">SOL Raffle</span>
+        {/* Raffles Grid */}
+        <section className="max-w-7xl mx-auto">
+            <div className="flex items-center justify-between mb-12">
+                <h2 className="text-3xl font-bold flex items-center gap-3">
+                    <span className="w-1.5 h-8 bg-gradient-to-b from-violet-500 to-fuchsia-500 rounded-full"></span>
+                    Active Raffles
+                </h2>
+                <div className="hidden md:flex gap-2">
+                    <span className="w-2 h-2 rounded-full bg-zinc-700"></span>
+                    <span className="w-2 h-2 rounded-full bg-zinc-700"></span>
+                    <span className="w-12 h-2 rounded-full bg-violet-500"></span>
+                </div>
             </div>
-            <p className="text-zinc-600 text-sm">© 2024 SOL Raffle. Built on Solana.</p>
-          </div>
+
+            {raffles.length === 0 ? (
+                <div className="glass-heavy rounded-3xl p-24 text-center border border-white/5">
+                    <div className="w-24 h-24 bg-zinc-800/50 rounded-full flex items-center justify-center mx-auto mb-6 text-5xl">🔭</div>
+                    <h3 className="text-2xl font-bold mb-2">No Active Raffles</h3>
+                    <p className="text-zinc-500">The metaverse is quiet... for now.</p>
+                </div>
+            ) : (
+                <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-8">
+                    {raffles.map((raffle, i) => (
+                        <RaffleCard key={raffle.id} raffle={raffle} index={i} />
+                    ))}
+                </div>
+            )}
+        </section>
+
+      </main>
+
+      <footer className="border-t border-white/5 bg-[#020203]">
+        <div className="max-w-7xl mx-auto px-6 py-12 flex flex-col md:flex-row items-center justify-between gap-6 opacity-50 hover:opacity-100 transition-opacity">
+            <div className="flex items-center gap-2">
+                <span className="font-bold text-lg">SOL Raffle</span>
+                <span className="text-xs px-2 py-0.5 rounded-md bg-white/10">v2.0</span>
+            </div>
+            <p className="text-sm">Built on Solana</p>
         </div>
       </footer>
     </div>
@@ -274,81 +245,81 @@ function RaffleCard({ raffle, index }: { raffle: Raffle; index: number }) {
     : raffle.prize_type === "nft"
       ? "1 NFT"
       : `${raffle.prize_amount} Tokens`;
+  
+  // Calculate progress percentage, capped at 100%
+  const progress = Math.min((raffle.total_tickets / (raffle.total_tickets + 10)) * 100, 100); 
+  // Note: Since we don't have max_tickets in the interface, I'm simulating a progress bar 
+  // or we can remove it. Let's make it look like it's filling up based on an arbitrary goal or just total.
+  // Actually, let's just show a visual indicator. If total_tickets is high, it looks fuller.
+  // For now, let's assume a "target" of 100 tickets produces a full bar for visual effect.
+  const visualProgress = Math.min((raffle.total_tickets / 100) * 100, 100);
 
   return (
     <div
-      className="group relative glass rounded-3xl overflow-hidden card-hover"
-      style={{ animationDelay: `${0.7 + index * 0.1}s` }}
+      className="group relative glass-heavy rounded-[2rem] overflow-hidden transition-all duration-500 hover:-translate-y-2 hover:shadow-[0_20px_40px_-15px_rgba(124,58,237,0.3)]"
+      style={{ animationDelay: `${0.1 * index}s` }}
     >
-      {/* Gradient Border on Hover */}
-      <div className="absolute inset-0 bg-gradient-to-r from-violet-500 via-fuchsia-500 to-cyan-500 rounded-3xl opacity-0 group-hover:opacity-100 transition-opacity duration-500 -z-10" style={{ padding: '1px' }} />
+      {/* Glow Effect */}
+      <div className="absolute -inset-0.5 bg-gradient-to-r from-violet-600 to-fuchsia-600 rounded-[2rem] opacity-0 group-hover:opacity-100 blur transition-opacity duration-500 -z-10" />
 
-      {/* Image Container */}
-      <div className="relative h-48 bg-gradient-to-br from-zinc-800 to-zinc-900 overflow-hidden">
+      {/* Image Area */}
+      <div className="relative h-64 overflow-hidden">
         {raffle.prize_image_url ? (
-          <img
-            src={raffle.prize_image_url}
-            alt={raffle.prize_name}
-            className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-700"
-          />
+            <img
+                src={raffle.prize_image_url}
+                alt={raffle.prize_name}
+                className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-110"
+            />
         ) : (
-          <div className="absolute inset-0 flex items-center justify-center">
-            <span className="text-6xl opacity-20 group-hover:scale-125 group-hover:opacity-40 transition-all duration-500">🎁</span>
-          </div>
+            <div className="w-full h-full bg-zinc-900 flex items-center justify-center">
+                <span className="text-6xl grayscale group-hover:grayscale-0 transition-all duration-500">🎁</span>
+            </div>
         )}
-
-        {/* Overlay Gradient */}
-        <div className="absolute inset-0 bg-gradient-to-t from-[#050507] via-transparent to-transparent" />
-
-        {/* Timer Badge */}
-        <div className={`absolute top-4 right-4 flex items-center gap-2 px-3 py-1.5 rounded-full text-xs font-bold backdrop-blur-md ${isUrgent
-          ? "bg-red-500/30 text-red-200 border border-red-500/50"
-          : "bg-black/50 text-white border border-white/20"
-          }`}>
-          {isUrgent && <span className="w-1.5 h-1.5 bg-red-400 rounded-full animate-pulse" />}
-          {hoursLeft}h {minutesLeft}m
-        </div>
-
-        {/* Prize Badge */}
-        <div className="absolute bottom-4 left-4">
-          <p className="text-2xl font-black text-white drop-shadow-lg">{prizeDisplay}</p>
+        
+        {/* Overlay */}
+        <div className="absolute inset-0 bg-gradient-to-t from-[#050507] via-transparent to-transparent opacity-90" />
+        
+        <div className="absolute top-4 right-4 backdrop-blur-md bg-black/40 border border-white/10 px-3 py-1.5 rounded-full flex items-center gap-2">
+            <div className={`w-2 h-2 rounded-full ${isUrgent ? 'bg-red-500 animate-pulse' : 'bg-emerald-500'}`} />
+            <span className={`text-xs font-mono font-bold ${isUrgent ? 'text-red-400' : 'text-emerald-400'}`}>
+                {hoursLeft}h {minutesLeft}m
+            </span>
         </div>
       </div>
 
       {/* Content */}
-      <div className="p-6">
-        <h3 className="font-bold text-lg truncate mb-4 group-hover:text-violet-300 transition-colors">
-          {raffle.prize_name}
-        </h3>
-
-        <div className="space-y-3 mb-6">
-          <div className="flex justify-between items-center">
-            <span className="text-zinc-500 text-sm">Entry Price</span>
-            <span className="font-bold text-emerald-400">◎ {raffle.ticket_price}</span>
-          </div>
-
-          <div className="flex justify-between items-center">
-            <span className="text-zinc-500 text-sm">Total Entries</span>
-            <div className="flex items-center gap-2">
-              <div className="h-1.5 w-16 bg-zinc-800 rounded-full overflow-hidden">
-                <div
-                  className="h-full bg-gradient-to-r from-violet-500 to-fuchsia-500 rounded-full transition-all duration-500"
-                  style={{ width: `${Math.min(raffle.total_tickets / 100 * 100, 100)}%` }}
-                />
-              </div>
-              <span className="font-bold text-sm">{raffle.total_tickets}</span>
-            </div>
-          </div>
+      <div className="p-8 relative">
+        <div className="absolute top-0 right-8 -translate-y-1/2 bg-[#050507] border border-white/10 px-4 py-2 rounded-xl shadow-xl">
+             <span className="text-xl font-black text-transparent bg-clip-text bg-gradient-to-r from-violet-400 to-fuchsia-400">
+                {prizeDisplay}
+             </span>
         </div>
 
-        {/* CTA */}
-        <div className="pt-4 border-t border-white/5">
-          <a
-            href={`/raffles/${raffle.id}`}
-            className="w-full flex items-center justify-center gap-2 py-3 rounded-xl bg-white/5 hover:bg-gradient-to-r hover:from-violet-600 hover:to-fuchsia-600 hover:text-white transition-all text-sm font-semibold group-hover:shadow-lg group-hover:shadow-violet-500/20"
-          >
-            Buy Tickets
-          </a>
+        <h3 className="text-xl font-bold mb-1 line-clamp-1 group-hover:text-violet-300 transition-colors">{raffle.prize_name}</h3>
+        <p className="text-zinc-500 text-sm mb-6">Hosted by Official</p>
+
+        {/* Progress Bar */}
+        <div className="mb-6">
+            <div className="flex justify-between text-xs font-medium mb-2">
+                <span className="text-zinc-400">Tickets Sold</span>
+                <span className="text-white">{raffle.total_tickets}</span>
+            </div>
+            <div className="h-2 w-full bg-zinc-800 rounded-full overflow-hidden">
+                <div 
+                    className="h-full bg-gradient-to-r from-violet-500 to-fuchsia-500 rounded-full"
+                    style={{ width: `${visualProgress}%` }}
+                />
+            </div>
+        </div>
+
+        <div className="flex items-center justify-between gap-4">
+            <div className="flex flex-col">
+                <span className="text-xs text-zinc-500">Price</span>
+                <span className="font-bold text-white">◎ {raffle.ticket_price}</span>
+            </div>
+            <a href={`/raffles/${raffle.id}`} className="flex-1 bg-white text-black font-bold py-3 rounded-xl text-center hover:bg-violet-500 hover:text-white transition-all transform active:scale-95">
+                Join Now
+            </a>
         </div>
       </div>
     </div>
