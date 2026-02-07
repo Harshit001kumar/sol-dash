@@ -87,7 +87,8 @@ export async function GET(request: NextRequest) {
                     { status: "ended" },
                     { end_time: { $lte: now } }
                 ],
-                winner_wallet: null // No winner yet
+                winner_wallet: null, // No winner yet
+                total_tickets: { $gt: 0 } // Only raffles with tickets sold
             };
         } else {
             // Default to all or separate logic if needed
