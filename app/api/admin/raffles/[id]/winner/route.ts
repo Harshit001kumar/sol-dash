@@ -84,9 +84,15 @@ export async function POST(
         const winnerWallet = winningTicket.wallet_address;
         const winnerDiscordId = winningTicket.user_discord_id; // Might be useful
 
+        // Handle case where old tickets might not have wallet_address
+        if (!winnerWallet) {
+            console.error("Winning ticket missing wallet_address:", winningTicket);
+            return NextResponse.json({ error: "Winning ticket has no wallet address. Data may be corrupted." }, { status: 500 });
+        }
+
         // Fetch user for name
         const winnerUser = await db.collection("users").findOne({ wallet_address: winnerWallet });
-        const winnerName = winnerUser?.custom_username || "Unknown User";
+        const winnerName = winnerUser?.custom_username || `User ${winnerDiscordId || "Unknown"}`;
 
         // 5. Update Raffle
         await db.collection("raffles").updateOne(
