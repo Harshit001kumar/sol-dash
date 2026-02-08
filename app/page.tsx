@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { WalletMultiButton } from "@solana/wallet-adapter-react-ui";
+import LiveTicker from "@/components/LiveTicker";
 
 interface Raffle {
   id: number;
@@ -84,8 +85,8 @@ export default function Home() {
           {/* Center Links */}
           <div className="hidden md:flex items-center gap-1 bg-[#111117] p-1 rounded-xl border border-white/5">
             <Link href="/" className="px-4 py-2 text-sm font-medium text-white bg-white/10 rounded-lg">Raffles</Link>
-            <Link href="/dashboard" className="px-4 py-2 text-sm font-medium text-zinc-400 hover:text-white rounded-lg transition-colors">Dashboard</Link>
-            <Link href="/history" className="px-4 py-2 text-sm font-medium text-zinc-400 hover:text-white rounded-lg transition-colors">History</Link>
+            <Link href="/profile" className="px-4 py-2 text-sm font-medium text-zinc-400 hover:text-white rounded-lg transition-colors">Profile</Link>
+            <Link href="/winners" className="px-4 py-2 text-sm font-medium text-zinc-400 hover:text-white rounded-lg transition-colors">Winners</Link>
           </div>
 
           {/* Right Side */}
@@ -98,6 +99,9 @@ export default function Home() {
             <WalletMultiButton />
           </div>
         </div>
+        
+        {/* Live Ticker */}
+        <LiveTicker />
       </nav>
 
       <main className="max-w-7xl mx-auto px-6 py-8">
@@ -164,6 +168,36 @@ export default function Home() {
                   Buy Tickets Now
                 </Link>
               </div>
+            </div>
+          </section>
+        )}
+
+        {/* Stats Section */}
+        {stats && (
+          <section className="mb-12 grid grid-cols-2 md:grid-cols-4 gap-4">
+            <div className="glass-card rounded-2xl p-6 text-center group hover:border-emerald-500/30 transition-all">
+              <div className="text-3xl font-black text-emerald-400 mb-1 group-hover:scale-110 transition-transform">
+                {stats.activeRaffles}
+              </div>
+              <div className="text-xs text-zinc-500 uppercase tracking-wider">Live Raffles</div>
+            </div>
+            <div className="glass-card rounded-2xl p-6 text-center group hover:border-cyan-500/30 transition-all">
+              <div className="text-3xl font-black text-cyan-400 mb-1 group-hover:scale-110 transition-transform">
+                {stats.totalUsers}
+              </div>
+              <div className="text-xs text-zinc-500 uppercase tracking-wider">Total Users</div>
+            </div>
+            <div className="glass-card rounded-2xl p-6 text-center group hover:border-violet-500/30 transition-all">
+              <div className="text-3xl font-black text-violet-400 mb-1 group-hover:scale-110 transition-transform">
+                {stats.totalTickets}
+              </div>
+              <div className="text-xs text-zinc-500 uppercase tracking-wider">Tickets Sold</div>
+            </div>
+            <div className="glass-card rounded-2xl p-6 text-center group hover:border-amber-500/30 transition-all">
+              <div className="text-3xl font-black text-amber-400 mb-1 group-hover:scale-110 transition-transform">
+                ◎{stats.totalRevenue.toFixed(1)}
+              </div>
+              <div className="text-xs text-zinc-500 uppercase tracking-wider">SOL Volume</div>
             </div>
           </section>
         )}

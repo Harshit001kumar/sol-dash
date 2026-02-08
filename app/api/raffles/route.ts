@@ -1,11 +1,24 @@
-import { NextResponse } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 import { getDatabase } from "@/lib/mongodb";
 
 export const dynamic = "force-dynamic";
 
-export async function GET() {
+export async function GET(request: NextRequest) {
     try {
         const db = await getDatabase();
+        const { searchParams } = new URL(request.url);
+        const filter = searchParams.get("filter");
+
+        // Handle winners filter
+        if (filter === "winners") {
+            const winners = await db
+                .collection("raffles")
+                .find({ winner_wallet: { $ne: null } })
+                .sort({ end_time: -1 })
+                .limit(20)
+                .toArray();
+            return NextResponse.json({ raffles: winners });
+        }
 
         const now = new Date();
 
@@ -69,3 +82,4 @@ export async function GET() {
         );
     }
 }
+
