@@ -1,10 +1,19 @@
 "use client";
 
 import { useWallet } from "@solana/wallet-adapter-react";
-import { useRouter } from "next/navigation";
+import { useRouter, usePathname } from "next/navigation";
 import { useEffect, useState } from "react";
+import Link from "next/link";
+import Sidebar from "@/components/Sidebar";
 
 const ADMIN_WALLET = process.env.NEXT_PUBLIC_ADMIN_WALLET;
+
+const adminNavItems = [
+    { label: "Dashboard", href: "/admin", icon: "📊" },
+    { label: "Create Raffle", href: "/admin/raffles/create", icon: "➕" },
+    { label: "Airdrop", href: "/admin/airdrop", icon: "✈️" },
+    { label: "Settings", href: "/admin/settings", icon: "⚙️" },
+];
 
 export default function AdminLayout({
     children,
@@ -13,11 +22,11 @@ export default function AdminLayout({
 }) {
     const { publicKey, connected } = useWallet();
     const router = useRouter();
+    const pathname = usePathname();
     const [isAuthorized, setIsAuthorized] = useState(false);
     const [loading, setLoading] = useState(true);
 
     useEffect(() => {
-        // Wait for wallet to initialize
         const checkAuth = setTimeout(() => {
             if (!connected) {
                 setLoading(false);
@@ -28,22 +37,28 @@ export default function AdminLayout({
                 setIsAuthorized(true);
             }
             setLoading(false);
-        }, 1000); // Small delay to allow wallet adapter to load
+        }, 1000);
 
         return () => clearTimeout(checkAuth);
     }, [connected, publicKey]);
 
     if (loading) {
         return (
-            <div className="min-h-screen bg-[#050507] flex items-center justify-center text-white">
-                <div className="animate-spin w-8 h-8 border-2 border-violet-500 rounded-full border-t-transparent"></div>
+            <div className="min-h-screen app-bg flex items-center justify-center">
+                <div className="flex flex-col items-center gap-4">
+                    <div className="w-10 h-10 border-2 border-emerald-500 border-t-transparent rounded-full animate-spin" />
+                    <p className="text-zinc-500 text-sm">Verifying access...</p>
+                </div>
             </div>
         );
     }
 
     if (!connected) {
         return (
-            <div className="min-h-screen bg-[#050507] flex flex-col items-center justify-center text-white gap-4">
+            <div className="min-h-screen app-bg flex flex-col items-center justify-center text-white gap-6">
+                <div className="w-20 h-20 rounded-2xl bg-[#111117] border border-white/10 flex items-center justify-center text-4xl">
+                    🔐
+                </div>
                 <h1 className="text-2xl font-bold">Admin Access Only</h1>
                 <p className="text-zinc-500">Please connect the authorized admin wallet.</p>
             </div>
@@ -52,12 +67,15 @@ export default function AdminLayout({
 
     if (!isAuthorized) {
         return (
-            <div className="min-h-screen bg-[#050507] flex flex-col items-center justify-center text-white gap-4">
-                <h1 className="text-red-500 text-2xl font-bold">Unauthorized</h1>
+            <div className="min-h-screen app-bg flex flex-col items-center justify-center text-white gap-6">
+                <div className="w-20 h-20 rounded-2xl bg-red-500/10 border border-red-500/20 flex items-center justify-center text-4xl">
+                    ⛔
+                </div>
+                <h1 className="text-2xl font-bold text-red-400">Unauthorized</h1>
                 <p className="text-zinc-500">Your wallet is not authorized to view this page.</p>
                 <button
                     onClick={() => router.push("/")}
-                    className="px-4 py-2 bg-white/10 rounded-lg hover:bg-white/20"
+                    className="px-6 py-3 bg-white/10 hover:bg-white/20 rounded-xl font-medium transition-colors"
                 >
                     Go Home
                 </button>
@@ -66,54 +84,38 @@ export default function AdminLayout({
     }
 
     return (
-        <div className="min-h-screen nebula-bg text-white selection:bg-violet-500/30">
-            {/* Background Elements */}
-            <div className="fixed inset-0 pointer-events-none z-0">
-                <div className="absolute inset-0 bg-[url('/grid.svg')] opacity-[0.03]" />
-                <div className="absolute top-[-10%] left-[-10%] w-[500px] h-[500px] bg-violet-600/10 rounded-full blur-[120px]" />
-                <div className="absolute bottom-[-10%] right-[-10%] w-[500px] h-[500px] bg-cyan-600/10 rounded-full blur-[120px]" />
-            </div>
+        <div className="min-h-screen app-bg text-white">
+            {/* Sidebar */}
+            <Sidebar items={adminNavItems} />
 
-            <nav className="glass-heavy sticky top-0 z-50 animate-slide-up">
-                <div className="max-w-7xl mx-auto px-6 h-20 flex items-center justify-between">
+            {/* Main Content */}
+            <div className="ml-64">
+                {/* Top Bar */}
+                <header className="sticky top-0 z-40 h-16 border-b border-white/5 bg-[#0a0a0f]/80 backdrop-blur-xl flex items-center justify-between px-8">
+                    <div className="flex items-center gap-4">
+                        <nav className="flex items-center gap-2 text-sm text-zinc-400">
+                            <Link href="/admin" className="hover:text-white transition-colors">Admin</Link>
+                            <span>/</span>
+                            <span className="text-white">
+                                {pathname === "/admin" ? "Dashboard" : 
+                                 pathname.includes("create") ? "Create Raffle" :
+                                 pathname.includes("airdrop") ? "Airdrop" : "Page"}
+                            </span>
+                        </nav>
+                    </div>
                     <div className="flex items-center gap-3">
-                        <div className="w-10 h-10 bg-gradient-to-br from-violet-600 to-fuchsia-600 rounded-xl flex items-center justify-center shadow-lg shadow-violet-500/20">
-                            <span className="font-bold text-white">⚙️</span>
-                        </div>
-                        <span className="text-xl font-bold bg-gradient-to-r from-white to-zinc-400 bg-clip-text text-transparent">
-                            Admin Panel
+                        <span className="text-sm text-zinc-500">
+                            {publicKey?.toBase58().slice(0, 4)}...{publicKey?.toBase58().slice(-4)}
                         </span>
+                        <div className="w-8 h-8 rounded-full bg-gradient-to-br from-emerald-500 to-cyan-500" />
                     </div>
+                </header>
 
-                    <div className="flex items-center gap-1 bg-white/5 p-1 rounded-xl border border-white/5 backdrop-blur-md">
-                        <NavLink href="/admin" label="Overview" active />
-                        <NavLink href="/admin/raffles/create" label="Create" />
-                        <NavLink href="/admin/airdrop" label="Airdrop" />
-                        <NavLink href="/" label="Exit" warning />
-                    </div>
-                </div>
-            </nav>
-
-            <main className="relative z-10 max-w-7xl mx-auto px-6 py-12 animate-fade-in" style={{animationDelay: '0.1s'}}>
-                {children}
-            </main>
+                {/* Page Content */}
+                <main className="p-8">
+                    {children}
+                </main>
+            </div>
         </div>
-    );
-}
-
-function NavLink({ href, label, active, warning }: { href: string; label: string; active?: boolean; warning?: boolean }) {
-    return (
-        <a
-            href={href}
-            className={`px-4 py-2 rounded-lg text-sm font-semibold transition-all duration-300 ${
-                active
-                    ? "bg-white/10 text-white shadow-lg shadow-white/5"
-                    : warning 
-                        ? "text-red-400 hover:bg-red-500/10 hover:text-red-300"
-                        : "text-zinc-400 hover:text-white hover:bg-white/5"
-            }`}
-        >
-            {label}
-        </a>
     );
 }

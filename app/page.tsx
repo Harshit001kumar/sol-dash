@@ -1,7 +1,7 @@
 "use client";
 
-import { useEffect, useState, useRef } from "react";
-import LiveTicker from "@/components/LiveTicker";
+import { useEffect, useState } from "react";
+import Link from "next/link";
 import { WalletMultiButton } from "@solana/wallet-adapter-react-ui";
 
 interface Raffle {
@@ -24,55 +24,15 @@ interface Stats {
   totalTickets: number;
 }
 
-// Animated Counter Component
-function AnimatedCounter({ value, duration = 2000 }: { value: number; duration?: number }) {
-  const [count, setCount] = useState(0);
-  const countRef = useRef(0);
-
-  useEffect(() => {
-    const startTime = Date.now();
-    const endValue = value;
-
-    const animate = () => {
-      const now = Date.now();
-      const progress = Math.min((now - startTime) / duration, 1);
-      const easeOut = 1 - Math.pow(1 - progress, 3);
-      const currentValue = Math.floor(easeOut * endValue);
-
-      if (currentValue !== countRef.current) {
-        countRef.current = currentValue;
-        setCount(currentValue);
-      }
-
-      if (progress < 1) {
-        requestAnimationFrame(animate);
-      }
-    };
-
-    requestAnimationFrame(animate);
-  }, [value, duration]);
-
-  return <>{count.toLocaleString()}</>;
-}
-
-// Floating Orb Component
-function FloatingOrb({ className, delay = 0 }: { className?: string; delay?: number }) {
-  return (
-    <div
-      className={`absolute rounded-full blur-[100px] opacity-20 animate-float ${className}`}
-      style={{ animationDelay: `${delay}s` }}
-    />
-  );
-}
+type Filter = "all" | "featured" | "ending" | "mine";
 
 export default function Home() {
   const [raffles, setRaffles] = useState<Raffle[]>([]);
   const [stats, setStats] = useState<Stats | null>(null);
   const [loading, setLoading] = useState(true);
-  const [mounted, setMounted] = useState(false);
+  const [filter, setFilter] = useState<Filter>("all");
 
   useEffect(() => {
-    setMounted(true);
     fetch("/api/raffles")
       .then((res) => res.json())
       .then((data) => {
@@ -83,157 +43,207 @@ export default function Home() {
       .catch(() => setLoading(false));
   }, []);
 
+  // Featured raffle is the one ending soonest with highest tickets
+  const featuredRaffle = raffles.length > 0 
+    ? raffles.reduce((prev, curr) => (curr.total_tickets > prev.total_tickets ? curr : prev))
+    : null;
+
+  // Filter raffles
+  const filteredRaffles = raffles.filter(r => {
+    if (filter === "ending") {
+      const timeLeft = new Date(r.end_time).getTime() - Date.now();
+      return timeLeft < 24 * 60 * 60 * 1000; // Ending in 24h
+    }
+    return true;
+  });
+
   if (loading) {
     return (
-      <div className="min-h-screen bg-[#050507] flex items-center justify-center">
-        <div className="flex flex-col items-center gap-6">
-            <div className="relative w-24 h-24">
-                <div className="absolute inset-0 border-t-4 border-violet-500 rounded-full animate-spin"></div>
-                <div className="absolute inset-4 border-t-4 border-fuchsia-500 rounded-full animate-spin" style={{ animationDirection: 'reverse' }}></div>
-            </div>
-          <p className="text-violet-400 text-sm tracking-[0.5em] uppercase animate-pulse">Initializing</p>
+      <div className="min-h-screen app-bg flex items-center justify-center">
+        <div className="flex flex-col items-center gap-4">
+          <div className="w-12 h-12 border-2 border-emerald-500 border-t-transparent rounded-full animate-spin" />
+          <p className="text-zinc-500 text-sm">Loading raffles...</p>
         </div>
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen nebula-bg text-white overflow-x-hidden font-sans selection:bg-violet-500/30">
-      
-      {/* Background Elements */}
-      <div className="fixed inset-0 pointer-events-none z-0">
-        <div className="absolute inset-0 bg-[url('/grid.svg')] opacity-[0.03]" />
-        <FloatingOrb className="w-[800px] h-[800px] bg-violet-900/40 top-[-20%] left-[-20%]" delay={0} />
-        <FloatingOrb className="w-[600px] h-[600px] bg-fuchsia-900/40 bottom-[-10%] right-[-10%]" delay={2} />
-      </div>
-
-      {/* Navigation */}
-      <nav className={`fixed top-0 left-0 right-0 z-50 glass-heavy transition-all duration-700 ${mounted ? 'translate-y-0 opacity-100' : '-translate-y-full opacity-0'}`}>
-        <div className="max-w-7xl mx-auto px-6 h-20 flex items-center justify-between">
-            <div className="flex items-center gap-3 group cursor-pointer">
-                <div className="relative w-10 h-10 flex items-center justify-center bg-gradient-to-br from-violet-600 to-fuchsia-600 rounded-xl shadow-lg shadow-violet-500/20 group-hover:shadow-violet-500/40 transition-shadow">
-                    <span className="text-xl font-bold text-white">◎</span>
-                </div>
-                <span className="font-bold text-xl tracking-tight text-white group-hover:text-violet-200 transition-colors">SOL Raffle</span>
+    <div className="min-h-screen app-bg text-white">
+      {/* Top Navigation */}
+      <nav className="sticky top-0 z-50 border-b border-white/5 bg-[#0a0a0f]/80 backdrop-blur-xl">
+        <div className="max-w-7xl mx-auto px-6 h-16 flex items-center justify-between">
+          {/* Logo */}
+          <Link href="/" className="flex items-center gap-3">
+            <div className="w-9 h-9 rounded-lg bg-gradient-to-br from-emerald-500 to-teal-500 flex items-center justify-center shadow-lg shadow-emerald-500/20">
+              <span className="text-lg font-bold">◎</span>
             </div>
+            <span className="font-bold text-lg text-white">Solana Raffles</span>
+          </Link>
 
-            <div className="flex items-center gap-6">
-                <a href="/profile" className="hidden md:block text-sm font-medium text-zinc-400 hover:text-white transition-colors relative hover:after:content-[''] hover:after:absolute hover:after:-bottom-1 hover:after:left-0 hover:after:w-full hover:after:h-px hover:after:bg-violet-500">
-                    Profile
-                </a>
-                
-                {/* Replaced manual verify button with standard wallet button for robustness */}
-                <WalletMultiButton className="!bg-gradient-to-r !from-violet-600 !to-fuchsia-600 hover:!from-violet-500 hover:!to-fuchsia-500 !rounded-xl !h-[42px] !font-bold !text-sm !px-6 transition-all" />
-            </div>
+          {/* Center Links */}
+          <div className="hidden md:flex items-center gap-1 bg-[#111117] p-1 rounded-xl border border-white/5">
+            <Link href="/" className="px-4 py-2 text-sm font-medium text-white bg-white/10 rounded-lg">Raffles</Link>
+            <Link href="/dashboard" className="px-4 py-2 text-sm font-medium text-zinc-400 hover:text-white rounded-lg transition-colors">Dashboard</Link>
+            <Link href="/history" className="px-4 py-2 text-sm font-medium text-zinc-400 hover:text-white rounded-lg transition-colors">History</Link>
+          </div>
+
+          {/* Right Side */}
+          <div className="flex items-center gap-4">
+            {stats && (
+              <div className="hidden md:flex items-center gap-2 px-3 py-1.5 bg-[#111117] rounded-lg border border-white/5">
+                <span className="text-emerald-400 font-bold text-sm">◎ {stats.totalRevenue.toFixed(1)}</span>
+              </div>
+            )}
+            <WalletMultiButton />
+          </div>
         </div>
-        
-        {/* Live Ticker Component */}
-        <LiveTicker />
       </nav>
 
-      <main className="relative z-10 pt-40 pb-20 px-6">
-        
-        {/* Hero Section */}
-        <section className={`max-w-7xl mx-auto mb-32 flex flex-col md:flex-row items-center gap-12 ${mounted ? 'animate-fade-in' : 'opacity-0'}`}>
-            <div className="flex-1 text-center md:text-left">
-                <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full border border-emerald-500/30 bg-emerald-500/10 text-emerald-400 text-xs font-bold tracking-wider uppercase mb-8 animate-slide-up" style={{animationDelay: '0.1s'}}>
-                    <span className="w-2 h-2 bg-emerald-400 rounded-full animate-pulse shadow-[0_0_10px_#34d399]" />
-                    Live on Solana Mainnet
+      <main className="max-w-7xl mx-auto px-6 py-8">
+        {/* Featured Raffle Hero */}
+        {featuredRaffle && (
+          <section className="mb-12 rounded-3xl overflow-hidden bg-gradient-to-r from-[#111117] to-[#0d0d12] border border-white/5">
+            <div className="grid md:grid-cols-2 gap-0">
+              {/* Left: Image */}
+              <div className="relative h-80 md:h-auto">
+                {featuredRaffle.prize_image_url ? (
+                  <img
+                    src={featuredRaffle.prize_image_url}
+                    alt={featuredRaffle.prize_name}
+                    className="w-full h-full object-cover"
+                  />
+                ) : (
+                  <div className="w-full h-full bg-gradient-to-br from-emerald-900/30 to-teal-900/30 flex items-center justify-center">
+                    <span className="text-8xl">🎁</span>
+                  </div>
+                )}
+                <div className="absolute top-4 left-4 flex items-center gap-2 px-3 py-1.5 bg-red-500 rounded-full text-xs font-bold text-white">
+                  <span className="w-2 h-2 bg-white rounded-full animate-pulse" />
+                  LIVE NOW
                 </div>
-                
-                <h1 className="text-5xl md:text-8xl font-black tracking-tighter leading-[0.9] mb-8 animate-slide-up" style={{animationDelay: '0.2s'}}>
-                    WIN BIG <br />
-                    <span className="text-transparent bg-clip-text bg-gradient-to-r from-violet-400 via-fuchsia-400 to-white animate-gradient">METAVERSE</span>
-                </h1>
+              </div>
 
-                <p className="text-lg text-zinc-400 max-w-xl mx-auto md:mx-0 leading-relaxed mb-10 animate-slide-up" style={{animationDelay: '0.3s'}}>
-                    The most transparent, on-chain raffle platform. Join thousands of winners securing blue-chip NFTs and SOL prizes daily.
+              {/* Right: Details */}
+              <div className="p-8 md:p-12 flex flex-col justify-center">
+                <p className="text-emerald-400 text-xs font-bold tracking-widest uppercase mb-3">FEATURED RAFFLE</p>
+                <h2 className="text-3xl md:text-4xl font-black text-white mb-4 leading-tight">
+                  {featuredRaffle.prize_name}
+                </h2>
+                <p className="text-zinc-400 text-sm mb-8 line-clamp-2">
+                  Get your entry now for a chance to win this amazing prize. Limited tickets available!
                 </p>
 
-                <div className="flex flex-col sm:flex-row items-center gap-4 animate-slide-up" style={{animationDelay: '0.4s'}}>
-                    <button onClick={() => window.scrollTo({ top: 800, behavior: 'smooth' })} className="w-full sm:w-auto px-8 py-4 bg-white text-black font-bold rounded-xl hover:scale-105 transition-transform shadow-[0_0_30px_rgba(255,255,255,0.3)]">
-                        Explore Raffles
-                    </button>
-                    <a href="/winners" className="w-full sm:w-auto px-8 py-4 glass text-white font-bold rounded-xl hover:bg-white/10 transition-colors text-center">
-                        View Winners
-                    </a>
+                {/* Stats Row */}
+                <div className="grid grid-cols-2 gap-4 mb-8">
+                  <div className="p-4 bg-white/5 rounded-xl border border-white/5">
+                    <p className="text-zinc-500 text-xs mb-1">TICKET PRICE</p>
+                    <p className="text-2xl font-black text-emerald-400">◎ {featuredRaffle.ticket_price}</p>
+                  </div>
+                  <div className="p-4 bg-white/5 rounded-xl border border-white/5">
+                    <p className="text-zinc-500 text-xs mb-1">TIME REMAINING</p>
+                    <CountdownTimer endTime={featuredRaffle.end_time} />
+                  </div>
                 </div>
-            </div>
 
-            {/* 3D Coin Visual */}
-            <div className="flex-1 relative h-[500px] w-full flex items-center justify-center animate-float-slow">
-                <div className="relative w-80 h-80 rounded-full bg-gradient-to-br from-violet-600 to-fuchsia-600 shadow-[0_0_100px_rgba(124,58,237,0.5)] flex items-center justify-center border-4 border-white/20 backdrop-blur-md">
-                    <span className="text-9xl font-black text-white drop-shadow-xl filter">◎</span>
-                    <div className="absolute inset-0 rounded-full border border-white/30 animate-spin-slow"></div>
-                    <div className="absolute inset-[-20px] rounded-full border border-violet-500/30 animate-spin-slow" style={{animationDirection: 'reverse'}}></div>
+                {/* Progress */}
+                <div className="mb-8">
+                  <div className="flex justify-between text-sm mb-2">
+                    <span className="text-zinc-400">PROGRESS</span>
+                    <span className="text-white font-bold">{featuredRaffle.total_tickets} / 1000 SOLD</span>
+                  </div>
+                  <div className="progress-bar">
+                    <div className="progress-bar-fill" style={{ width: `${Math.min((featuredRaffle.total_tickets / 1000) * 100, 100)}%` }} />
+                  </div>
                 </div>
-            </div>
-        </section>
 
-        {/* Stats Grid */}
-        {stats && (
-            <section className={`max-w-7xl mx-auto mb-32 grid grid-cols-2 md:grid-cols-4 gap-4 animate-slide-up`} style={{animationDelay: '0.5s'}}>
-                {[
-                  { value: stats.activeRaffles, label: "Live Raffles", color: "text-violet-400" },
-                  { value: stats.totalUsers, label: "Total Users", color: "text-fuchsia-400" },
-                  { value: stats.totalTickets, label: "Tickets Sold", color: "text-cyan-400" },
-                  { value: stats.totalRevenue, label: "SOL Volume", color: "text-emerald-400", isDecimal: true },
-                ].map((stat, i) => (
-                    <div key={i} className="glass rounded-2xl p-6 text-center hover:bg-white/5 transition-colors group">
-                        <p className={`text-4xl font-black ${stat.color} mb-2 group-hover:scale-110 transition-transform`}>
-                            {stat.isDecimal ? stats.totalRevenue.toFixed(1) : <AnimatedCounter value={stat.value} />}
-                        </p>
-                        <p className="text-zinc-500 text-sm font-medium uppercase tracking-wider">{stat.label}</p>
-                    </div>
-                ))}
-            </section>
+                <Link
+                  href={`/raffles/${featuredRaffle.id}`}
+                  className="btn-primary text-center text-lg"
+                >
+                  Buy Tickets Now
+                </Link>
+              </div>
+            </div>
+          </section>
         )}
 
-        {/* Raffles Grid */}
-        <section className="max-w-7xl mx-auto">
-            <div className="flex items-center justify-between mb-12">
-                <h2 className="text-3xl font-bold flex items-center gap-3">
-                    <span className="w-1.5 h-8 bg-gradient-to-b from-violet-500 to-fuchsia-500 rounded-full"></span>
-                    Active Raffles
-                </h2>
-                <div className="hidden md:flex gap-2">
-                    <span className="w-2 h-2 rounded-full bg-zinc-700"></span>
-                    <span className="w-2 h-2 rounded-full bg-zinc-700"></span>
-                    <span className="w-12 h-2 rounded-full bg-violet-500"></span>
-                </div>
+        {/* Filter Pills */}
+        <div className="flex flex-wrap items-center gap-4 mb-8">
+          <div className="pill-group">
+            <button 
+              className={`pill ${filter === "all" ? "active" : ""}`}
+              onClick={() => setFilter("all")}
+            >
+              🎯 All Raffles
+            </button>
+            <button 
+              className={`pill ${filter === "featured" ? "active" : ""}`}
+              onClick={() => setFilter("featured")}
+            >
+              ⭐ Featured
+            </button>
+            <button 
+              className={`pill ${filter === "ending" ? "active" : ""}`}
+              onClick={() => setFilter("ending")}
+            >
+              🔥 Ending Soon
+            </button>
+            <button 
+              className={`pill ${filter === "mine" ? "active" : ""}`}
+              onClick={() => setFilter("mine")}
+            >
+              🎟️ My Entries
+            </button>
+          </div>
+
+          <div className="flex-1" />
+
+          <div className="relative">
+            <input
+              type="text"
+              placeholder="Search collections, tokens, or prizes..."
+              className="w-80 px-4 py-2.5 bg-[#111117] border border-white/5 rounded-xl text-sm text-white placeholder-zinc-500 focus:outline-none focus:border-emerald-500/50"
+            />
+            <span className="absolute right-3 top-1/2 -translate-y-1/2 text-zinc-500">🔍</span>
+          </div>
+        </div>
+
+        {/* Raffle Grid */}
+        {filteredRaffles.length === 0 ? (
+          <div className="glass-card p-16 text-center">
+            <div className="w-20 h-20 bg-[#1a1a24] rounded-full flex items-center justify-center mx-auto mb-4 text-4xl">
+              🔭
             </div>
-
-            {raffles.length === 0 ? (
-                <div className="glass-heavy rounded-3xl p-24 text-center border border-white/5">
-                    <div className="w-24 h-24 bg-zinc-800/50 rounded-full flex items-center justify-center mx-auto mb-6 text-5xl">🔭</div>
-                    <h3 className="text-2xl font-bold mb-2">No Active Raffles</h3>
-                    <p className="text-zinc-500">The metaverse is quiet... for now.</p>
-                </div>
-            ) : (
-                <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-8">
-                    {raffles.map((raffle, i) => (
-                        <RaffleCard key={raffle.id} raffle={raffle} index={i} />
-                    ))}
-                </div>
-            )}
-        </section>
-
+            <h3 className="text-xl font-bold mb-2">No Raffles Found</h3>
+            <p className="text-zinc-500">Check back soon for new opportunities!</p>
+          </div>
+        ) : (
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
+            {filteredRaffles.map((raffle) => (
+              <RaffleCard key={raffle.id} raffle={raffle} />
+            ))}
+          </div>
+        )}
       </main>
 
-      <footer className="border-t border-white/5 bg-[#020203]">
-        <div className="max-w-7xl mx-auto px-6 py-12 flex flex-col md:flex-row items-center justify-between gap-6 opacity-50 hover:opacity-100 transition-opacity">
-            <div className="flex items-center gap-2">
-                <span className="font-bold text-lg">SOL Raffle</span>
-                <span className="text-xs px-2 py-0.5 rounded-md bg-white/10">v2.0</span>
-            </div>
-            <p className="text-sm">Built on Solana</p>
+      {/* Footer */}
+      <footer className="border-t border-white/5 mt-20">
+        <div className="max-w-7xl mx-auto px-6 py-8 flex flex-col md:flex-row items-center justify-between gap-4">
+          <p className="text-zinc-500 text-sm">Solana Raffles © 2025</p>
+          <div className="flex items-center gap-6 text-sm text-zinc-400">
+            <a href="#" className="hover:text-white transition-colors">Terms of Service</a>
+            <a href="#" className="hover:text-white transition-colors">Privacy Policy</a>
+            <a href="#" className="hover:text-white transition-colors">Discord</a>
+            <a href="#" className="hover:text-white transition-colors">Twitter</a>
+          </div>
         </div>
       </footer>
     </div>
   );
 }
 
-function RaffleCard({ raffle, index }: { raffle: Raffle; index: number }) {
+function RaffleCard({ raffle }: { raffle: Raffle }) {
   const endTime = new Date(raffle.end_time);
   const timeLeft = endTime.getTime() - Date.now();
   const hoursLeft = Math.max(0, Math.floor(timeLeft / (1000 * 60 * 60)));
@@ -241,87 +251,92 @@ function RaffleCard({ raffle, index }: { raffle: Raffle; index: number }) {
   const isUrgent = hoursLeft < 2;
 
   const prizeDisplay = raffle.prize_type === "sol"
-    ? `${raffle.prize_amount} SOL`
+    ? `◎ ${raffle.prize_amount}`
     : raffle.prize_type === "nft"
-      ? "1 NFT"
+      ? "NFT"
       : `${raffle.prize_amount} Tokens`;
-  
-  // Calculate progress percentage, capped at 100%
-  const progress = Math.min((raffle.total_tickets / (raffle.total_tickets + 10)) * 100, 100); 
-  // Note: Since we don't have max_tickets in the interface, I'm simulating a progress bar 
-  // or we can remove it. Let's make it look like it's filling up based on an arbitrary goal or just total.
-  // Actually, let's just show a visual indicator. If total_tickets is high, it looks fuller.
-  // For now, let's assume a "target" of 100 tickets produces a full bar for visual effect.
-  const visualProgress = Math.min((raffle.total_tickets / 100) * 100, 100);
 
   return (
-    <div
-      className="group relative glass-heavy rounded-[2rem] overflow-hidden transition-all duration-500 hover:-translate-y-2 hover:shadow-[0_20px_40px_-15px_rgba(124,58,237,0.3)]"
-      style={{ animationDelay: `${0.1 * index}s` }}
-    >
-      {/* Glow Effect */}
-      <div className="absolute -inset-0.5 bg-gradient-to-r from-violet-600 to-fuchsia-600 rounded-[2rem] opacity-0 group-hover:opacity-100 blur transition-opacity duration-500 -z-10" />
-
-      {/* Image Area */}
-      <div className="relative h-64 overflow-hidden">
-        {raffle.prize_image_url ? (
+    <Link href={`/raffles/${raffle.id}`} className="group">
+      <div className="glass-card rounded-2xl overflow-hidden transition-all duration-300 hover:border-emerald-500/30 hover:shadow-lg hover:shadow-emerald-500/5">
+        {/* Image */}
+        <div className="relative h-48 overflow-hidden">
+          {raffle.prize_image_url ? (
             <img
-                src={raffle.prize_image_url}
-                alt={raffle.prize_name}
-                className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-110"
+              src={raffle.prize_image_url}
+              alt={raffle.prize_name}
+              className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-110"
             />
-        ) : (
-            <div className="w-full h-full bg-zinc-900 flex items-center justify-center">
-                <span className="text-6xl grayscale group-hover:grayscale-0 transition-all duration-500">🎁</span>
+          ) : (
+            <div className="w-full h-full bg-gradient-to-br from-[#1a1a24] to-[#111117] flex items-center justify-center">
+              <span className="text-5xl grayscale group-hover:grayscale-0 transition-all">🎁</span>
             </div>
-        )}
-        
-        {/* Overlay */}
-        <div className="absolute inset-0 bg-gradient-to-t from-[#050507] via-transparent to-transparent opacity-90" />
-        
-        <div className="absolute top-4 right-4 backdrop-blur-md bg-black/40 border border-white/10 px-3 py-1.5 rounded-full flex items-center gap-2">
-            <div className={`w-2 h-2 rounded-full ${isUrgent ? 'bg-red-500 animate-pulse' : 'bg-emerald-500'}`} />
-            <span className={`text-xs font-mono font-bold ${isUrgent ? 'text-red-400' : 'text-emerald-400'}`}>
-                {hoursLeft}h {minutesLeft}m
+          )}
+
+          {/* Countdown Badge */}
+          <div className="countdown-badge">
+            <span className={`dot ${isUrgent ? "!bg-red-500" : ""}`} />
+            <span className={isUrgent ? "text-red-400" : ""}>{hoursLeft}h {minutesLeft}m</span>
+          </div>
+        </div>
+
+        {/* Content */}
+        <div className="p-4">
+          <div className="flex items-start justify-between gap-2 mb-3">
+            <div className="flex-1 min-w-0">
+              <h3 className="font-bold text-white truncate group-hover:text-emerald-400 transition-colors">
+                {raffle.prize_name}
+              </h3>
+              <p className="text-xs text-zinc-500">Official Raffle</p>
+            </div>
+            <span className="px-2 py-1 bg-emerald-500/10 text-emerald-400 text-xs font-bold rounded-lg border border-emerald-500/20">
+              {prizeDisplay}
             </span>
+          </div>
+
+          {/* Progress */}
+          <div className="mb-4">
+            <div className="flex justify-between text-xs mb-1">
+              <span className="text-zinc-500">Tickets Sold</span>
+              <span className="text-zinc-400">{raffle.total_tickets}/500</span>
+            </div>
+            <div className="progress-bar">
+              <div 
+                className="progress-bar-fill" 
+                style={{ width: `${Math.min((raffle.total_tickets / 500) * 100, 100)}%` }} 
+              />
+            </div>
+          </div>
+
+          {/* CTA */}
+          <button className="w-full py-3 bg-emerald-500 hover:bg-emerald-400 text-black font-bold rounded-xl transition-colors flex items-center justify-center gap-2">
+            Buy Ticket <span>→</span>
+          </button>
         </div>
       </div>
-
-      {/* Content */}
-      <div className="p-8 relative">
-        <div className="absolute top-0 right-8 -translate-y-1/2 bg-[#050507] border border-white/10 px-4 py-2 rounded-xl shadow-xl">
-             <span className="text-xl font-black text-transparent bg-clip-text bg-gradient-to-r from-violet-400 to-fuchsia-400">
-                {prizeDisplay}
-             </span>
-        </div>
-
-        <h3 className="text-xl font-bold mb-1 line-clamp-1 group-hover:text-violet-300 transition-colors">{raffle.prize_name}</h3>
-        <p className="text-zinc-500 text-sm mb-6">Hosted by Official</p>
-
-        {/* Progress Bar */}
-        <div className="mb-6">
-            <div className="flex justify-between text-xs font-medium mb-2">
-                <span className="text-zinc-400">Tickets Sold</span>
-                <span className="text-white">{raffle.total_tickets}</span>
-            </div>
-            <div className="h-2 w-full bg-zinc-800 rounded-full overflow-hidden">
-                <div 
-                    className="h-full bg-gradient-to-r from-violet-500 to-fuchsia-500 rounded-full"
-                    style={{ width: `${visualProgress}%` }}
-                />
-            </div>
-        </div>
-
-        <div className="flex items-center justify-between gap-4">
-            <div className="flex flex-col">
-                <span className="text-xs text-zinc-500">Price</span>
-                <span className="font-bold text-white">◎ {raffle.ticket_price}</span>
-            </div>
-            <a href={`/raffles/${raffle.id}`} className="flex-1 bg-white text-black font-bold py-3 rounded-xl text-center hover:bg-violet-500 hover:text-white transition-all transform active:scale-95">
-                Join Now
-            </a>
-        </div>
-      </div>
-    </div>
+    </Link>
   );
+}
+
+function CountdownTimer({ endTime }: { endTime: string }) {
+  const [timeLeft, setTimeLeft] = useState("");
+
+  useEffect(() => {
+    const update = () => {
+      const diff = new Date(endTime).getTime() - Date.now();
+      if (diff <= 0) {
+        setTimeLeft("ENDED");
+        return;
+      }
+      const h = Math.floor(diff / (1000 * 60 * 60));
+      const m = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60));
+      const s = Math.floor((diff % (1000 * 60)) / 1000);
+      setTimeLeft(`${h.toString().padStart(2, "0")}:${m.toString().padStart(2, "0")}:${s.toString().padStart(2, "0")}`);
+    };
+    update();
+    const interval = setInterval(update, 1000);
+    return () => clearInterval(interval);
+  }, [endTime]);
+
+  return <p className="text-2xl font-black text-white font-mono">{timeLeft}</p>;
 }

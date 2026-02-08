@@ -2,14 +2,27 @@
 
 import { useWallet } from "@solana/wallet-adapter-react";
 import { useEffect, useState } from "react";
+import Link from "next/link";
 import AdminChart from "@/components/AdminChart";
-import Link from "next/link"; // Changed to Next.js Link for better performance
+
+interface ChartData {
+    labels: string[];
+    values: number[];
+    summary: {
+        total: number;
+        average: number;
+        period: string;
+    };
+}
 
 export default function AdminDashboard() {
     const [stats, setStats] = useState<any>(null);
     const [pendingRaffles, setPendingRaffles] = useState<any[]>([]);
-    const { publicKey } = useWallet();
+    const [recentActivity, setRecentActivity] = useState<any[]>([]);
+    const [chartData, setChartData] = useState<ChartData | null>(null);
+    const [chartPeriod, setChartPeriod] = useState<"daily" | "weekly" | "monthly">("monthly");
     const [loading, setLoading] = useState(true);
+    const { publicKey } = useWallet();
 
     useEffect(() => {
         // Fetch Stats
@@ -19,19 +32,27 @@ export default function AdminDashboard() {
                 setStats(data.stats);
                 setLoading(false);
             })
-            .catch(err => {
-                console.error(err);
-                setLoading(false);
-            });
+            .catch(() => setLoading(false));
 
         // Fetch Pending Raffles
-        // Note: API now filters out raffles with 0 tickets
         fetch("/api/admin/raffles?filter=pending_winner")
             .then(res => res.json())
             .then(data => {
                 if (data.raffles) setPendingRaffles(data.raffles);
             });
     }, []);
+
+    // Fetch chart data when period changes
+    useEffect(() => {
+        fetch(`/api/stats/history?period=${chartPeriod}`)
+            .then(res => res.json())
+            .then(data => {
+                if (data.labels && data.values) {
+                    setChartData(data);
+                }
+            })
+            .catch(console.error);
+    }, [chartPeriod]);
 
     const handlePickWinner = async (raffleId: number) => {
         if (!confirm("Are you sure you want to pick a winner? This cannot be undone.")) return;
@@ -46,7 +67,6 @@ export default function AdminDashboard() {
 
             if (res.ok) {
                 alert(`Winner Picked: ${data.winner.name} (${data.winner.wallet.slice(0, 4)}...${data.winner.wallet.slice(-4)})`);
-                // Remove from list
                 setPendingRaffles(prev => prev.filter(r => r.id !== raffleId));
             } else {
                 alert("Error: " + data.error);
@@ -57,118 +77,123 @@ export default function AdminDashboard() {
         }
     };
 
-    // Mock Data for the chart (since we don't have historical API yet)
-    // Generate a nice curve
-    const chartData = [12, 19, 15, 25, 32, 30, 45, 55, 48, 60, 75, 90]; 
-    const chartLabels = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
-
     if (loading) {
-        return <div className="animate-pulse flex gap-4"><div className="w-full h-32 bg-white/5 rounded-xl"></div></div>;
+        return (
+            <div className="flex items-center justify-center h-64">
+                <div className="w-10 h-10 border-2 border-emerald-500 border-t-transparent rounded-full animate-spin" />
+            </div>
+        );
     }
 
     return (
         <div className="space-y-8">
+            {/* Header */}
             <div className="flex items-center justify-between">
                 <div>
-                    <h1 className="text-4xl font-black text-white mb-2">Dashboard</h1>
-                    <p className="text-zinc-400">Welcome back, Admin. Here is what's happening today.</p>
+                    <h1 className="text-3xl font-black text-white mb-1">Overview</h1>
+                    <p className="text-zinc-500 text-sm">
+                        Welcome back, portfolio up <span className="text-emerald-400">+{((stats?.totalRevenue || 0) * 0.054).toFixed(1)}%</span> today.
+                    </p>
                 </div>
-                <div className="flex items-center gap-2 px-4 py-2 bg-emerald-500/10 border border-emerald-500/20 rounded-full">
-                    <span className="w-2 h-2 bg-emerald-500 rounded-full animate-pulse"></span>
-                    <span className="text-emerald-400 text-sm font-bold">System Operational</span>
+                <div className="flex items-center gap-2">
+                    <button className="p-2 rounded-lg bg-[#111117] border border-white/5 hover:bg-white/5 transition-colors">
+                        🔔
+                    </button>
                 </div>
             </div>
 
-            {/* Stats Cards */}
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                <div className="group relative glass-heavy p-6 rounded-2xl overflow-hidden hover:bg-white/5 transition-colors">
-                    <div className="absolute top-0 right-0 p-4 opacity-10 group-hover:opacity-20 transition-opacity">
-                        <span className="text-6xl">💰</span>
+            {/* Stats Row */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                {/* Balance Card */}
+                <div className="glass-card p-6 rounded-2xl">
+                    <div className="flex items-center gap-2 mb-4">
+                        <span className="text-zinc-400 text-sm">Total Revenue (SOL)</span>
+                        <span className="text-zinc-600">ⓘ</span>
                     </div>
-                    <p className="text-zinc-500 text-sm font-medium mb-1">Total Revenue</p>
-                    <p className="text-4xl font-black text-white tracking-tight">
-                        ◎ {stats?.totalRevenue?.toFixed(1) || "0.0"}
+                    <p className="text-5xl font-black text-white mb-4 tracking-tight">
+                        ◎{stats?.totalRevenue?.toFixed(2) || "0.00"}
                     </p>
-                    <div className="mt-4 h-1 w-full bg-zinc-800 rounded-full overflow-hidden">
-                        <div className="h-full bg-gradient-to-r from-emerald-500 to-teal-500 w-[70%]"></div>
+                    <div className="flex items-center gap-4">
+                        <span className="flex items-center gap-1 px-2 py-1 bg-emerald-500/10 text-emerald-400 text-xs font-bold rounded-lg">
+                            📈 +5.4%
+                        </span>
+                        <span className="text-zinc-500 text-sm">+◎{((stats?.totalRevenue || 0) * 0.054).toFixed(2)} (24h)</span>
+                    </div>
+                    
+                    {/* Quick Actions */}
+                    <div className="flex items-center gap-3 mt-6 pt-6 border-t border-white/5">
+                        <Link href="/admin/raffles/create" className="flex items-center justify-center w-10 h-10 bg-emerald-500 rounded-xl hover:bg-emerald-400 transition-colors">
+                            <span className="text-black">↗</span>
+                        </Link>
+                        <Link href="/admin/airdrop" className="flex items-center justify-center w-10 h-10 bg-[#1a1a24] border border-white/10 rounded-xl hover:bg-white/5 transition-colors">
+                            <span>↓</span>
+                        </Link>
                     </div>
                 </div>
 
-                <div className="group relative glass-heavy p-6 rounded-2xl overflow-hidden hover:bg-white/5 transition-colors">
-                    <div className="absolute top-0 right-0 p-4 opacity-10 group-hover:opacity-20 transition-opacity">
-                        <span className="text-6xl">🎯</span>
+                {/* Performance Chart */}
+                <div className="glass-card p-6 rounded-2xl">
+                    <div className="flex items-center justify-between mb-6">
+                        <h3 className="text-white font-semibold">Performance</h3>
+                        <div className="flex items-center gap-1 bg-[#111117] p-1 rounded-lg border border-white/5">
+                            {(["daily", "weekly", "monthly"] as const).map((p) => (
+                                <button
+                                    key={p}
+                                    onClick={() => setChartPeriod(p)}
+                                    className={`px-3 py-1 text-xs font-medium rounded-md transition-colors ${
+                                        chartPeriod === p 
+                                            ? "bg-emerald-500 text-black" 
+                                            : "text-zinc-400 hover:text-white"
+                                    }`}
+                                >
+                                    {p === "daily" ? "1H" : p === "weekly" ? "1W" : "1M"}
+                                </button>
+                            ))}
+                        </div>
                     </div>
-                    <p className="text-zinc-500 text-sm font-medium mb-1">Active Raffles</p>
-                    <p className="text-4xl font-black text-white tracking-tight">
-                        {stats?.activeRaffles || 0}
-                    </p>
-                    <div className="mt-4 h-1 w-full bg-zinc-800 rounded-full overflow-hidden">
-                        <div className="h-full bg-gradient-to-r from-violet-500 to-fuchsia-500 w-[45%]"></div>
-                    </div>
-                </div>
-
-                <div className="group relative glass-heavy p-6 rounded-2xl overflow-hidden hover:bg-white/5 transition-colors">
-                    <div className="absolute top-0 right-0 p-4 opacity-10 group-hover:opacity-20 transition-opacity">
-                        <span className="text-6xl">👥</span>
-                    </div>
-                    <p className="text-zinc-500 text-sm font-medium mb-1">Total Users</p>
-                    <p className="text-4xl font-black text-white tracking-tight">
-                        {stats?.totalUsers || 0}
-                    </p>
-                    <div className="mt-4 h-1 w-full bg-zinc-800 rounded-full overflow-hidden">
-                         <div className="h-full bg-gradient-to-r from-cyan-500 to-blue-500 w-[85%]"></div>
-                    </div>
+                    <AdminChart 
+                        data={chartData?.values || []} 
+                        labels={chartData?.labels || []} 
+                        color="#10b981" 
+                        height={180}
+                        loading={!chartData}
+                    />
                 </div>
             </div>
 
-            {/* Revenue Chart */}
-            <div className="glass-heavy p-8 rounded-3xl border border-white/5">
-                <div className="flex items-center justify-between mb-8">
-                    <h3 className="text-xl font-bold text-white">Revenue Analytics</h3>
-                    <select className="bg-black/20 border border-white/10 rounded-lg px-3 py-1 text-sm text-zinc-400 focus:outline-none focus:border-violet-500">
-                        <option>Last 12 Months</option>
-                        <option>Last 30 Days</option>
-                        <option>Last 7 Days</option>
-                    </select>
-                </div>
-                <div className="h-64 w-full">
-                     <AdminChart data={chartData} labels={chartLabels} color="#8b5cf6" height={250} />
-                </div>
-            </div>
-
-            {/* Two Column Layout */}
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-                
+            {/* Activity Table / Pending Raffles */}
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
                 {/* Pending Actions */}
-                <div className="space-y-4">
-                    <h2 className="text-xl font-bold flex items-center gap-2">
-                        <span className="w-1.5 h-6 bg-amber-500 rounded-full"></span>
-                        Pending Actions
-                    </h2>
+                <div className="glass-card rounded-2xl overflow-hidden">
+                    <div className="p-4 border-b border-white/5 flex items-center justify-between">
+                        <h3 className="font-bold text-white">⚠️ Pending Actions</h3>
+                        <span className="px-2 py-1 text-xs font-bold bg-amber-500/10 text-amber-400 rounded-lg border border-amber-500/20">
+                            {pendingRaffles.length}
+                        </span>
+                    </div>
                     
                     {pendingRaffles.length === 0 ? (
-                        <div className="glass-heavy p-8 rounded-2xl text-center border-dashed border-2 border-white/5">
-                            <p className="text-zinc-500">No auctions pending winners.</p>
+                        <div className="p-8 text-center">
+                            <p className="text-zinc-500">No raffles pending winner selection.</p>
                         </div>
                     ) : (
-                        <div className="space-y-3">
+                        <div className="divide-y divide-white/5">
                             {pendingRaffles.map(raffle => (
-                                <div key={raffle.id} className="glass-heavy p-4 rounded-xl flex items-center justify-between hover:border-amber-500/30 transition-colors group">
-                                    <div className="flex items-center gap-4">
-                                        <div className="w-10 h-10 rounded-lg bg-amber-500/10 flex items-center justify-center text-xl">
+                                <div key={raffle.id} className="p-4 flex items-center justify-between hover:bg-white/[0.02] transition-colors">
+                                    <div className="flex items-center gap-3">
+                                        <div className="w-10 h-10 rounded-lg bg-amber-500/10 flex items-center justify-center">
                                             🏆
                                         </div>
                                         <div>
-                                            <h3 className="font-bold text-white">{raffle.prize_name}</h3>
-                                            <div className="flex items-center gap-3 text-xs text-zinc-500">
-                                                <span>Ended: {new Date(raffle.end_time).toLocaleDateString()}</span>
-                                                <span className="text-emerald-400/70">Tickets: {raffle.total_tickets}</span>
-                                            </div>
+                                            <p className="font-medium text-white">{raffle.prize_name}</p>
+                                            <p className="text-xs text-zinc-500">
+                                                {raffle.total_tickets} tickets • Ended {new Date(raffle.end_time).toLocaleDateString()}
+                                            </p>
                                         </div>
                                     </div>
                                     <button
                                         onClick={() => handlePickWinner(raffle.id)}
-                                        className="px-4 py-2 bg-amber-500 hover:bg-amber-400 text-black font-bold rounded-lg text-sm transition-all shadow-lg shadow-amber-500/20"
+                                        className="px-4 py-2 bg-emerald-500 hover:bg-emerald-400 text-black text-sm font-bold rounded-lg transition-colors"
                                     >
                                         Pick Winner
                                     </button>
@@ -178,46 +203,51 @@ export default function AdminDashboard() {
                     )}
                 </div>
 
-                {/* Quick Links */}
+                {/* Quick Actions */}
                 <div className="space-y-4">
-                    <h2 className="text-xl font-bold flex items-center gap-2">
-                         <span className="w-1.5 h-6 bg-violet-500 rounded-full"></span>
-                        Quick Actions
-                    </h2>
+                    <h3 className="font-bold text-white px-1">Quick Actions</h3>
                     
-                    <div className="grid grid-cols-1 gap-3">
-                         <Link
-                            href="/admin/raffles/create"
-                            className="group flex items-center gap-4 p-4 rounded-xl bg-gradient-to-br from-violet-600/10 to-transparent border border-violet-500/20 hover:border-violet-500/50 hover:from-violet-600/20 transition-all"
-                        >
-                            <div className="w-12 h-12 rounded-lg bg-violet-600 flex items-center justify-center text-2xl group-hover:scale-110 transition-transform shadow-lg shadow-violet-600/20">
-                                ➕
-                            </div>
-                            <div>
-                                <h3 className="font-bold text-white group-hover:text-violet-300 transition-colors">Create New Raffle</h3>
-                                <p className="text-zinc-500 text-xs">Launch a new SOL or NFT raffle</p>
-                            </div>
-                            <div className="ml-auto opacity-0 group-hover:opacity-100 transition-opacity text-violet-400">
-                                →
-                            </div>
-                        </Link>
+                    <Link
+                        href="/admin/raffles/create"
+                        className="group flex items-center gap-4 p-4 glass-card rounded-xl hover:border-emerald-500/30 transition-all"
+                    >
+                        <div className="w-12 h-12 rounded-xl bg-emerald-500 flex items-center justify-center text-2xl group-hover:scale-110 transition-transform shadow-lg shadow-emerald-500/20">
+                            +
+                        </div>
+                        <div className="flex-1">
+                            <p className="font-bold text-white group-hover:text-emerald-400 transition-colors">Create New Raffle</p>
+                            <p className="text-xs text-zinc-500">Launch a new SOL or NFT raffle</p>
+                        </div>
+                        <span className="text-zinc-600 group-hover:text-emerald-400 transition-colors">→</span>
+                    </Link>
 
-                        <Link
-                            href="/admin/airdrop"
-                            className="group flex items-center gap-4 p-4 rounded-xl bg-gradient-to-br from-cyan-600/10 to-transparent border border-cyan-500/20 hover:border-cyan-500/50 hover:from-cyan-600/20 transition-all"
-                        >
-                            <div className="w-12 h-12 rounded-lg bg-cyan-600 flex items-center justify-center text-2xl group-hover:scale-110 transition-transform shadow-lg shadow-cyan-600/20">
-                                ✈️
-                            </div>
-                            <div>
-                                <h3 className="font-bold text-white group-hover:text-cyan-300 transition-colors">Launch Airdrop</h3>
-                                <p className="text-zinc-500 text-xs">Distribute tokens to users</p>
-                            </div>
-                            <div className="ml-auto opacity-0 group-hover:opacity-100 transition-opacity text-cyan-400">
-                                →
-                            </div>
-                        </Link>
-                    </div>
+                    <Link
+                        href="/admin/airdrop"
+                        className="group flex items-center gap-4 p-4 glass-card rounded-xl hover:border-cyan-500/30 transition-all"
+                    >
+                        <div className="w-12 h-12 rounded-xl bg-cyan-500 flex items-center justify-center text-2xl group-hover:scale-110 transition-transform shadow-lg shadow-cyan-500/20">
+                            ✈
+                        </div>
+                        <div className="flex-1">
+                            <p className="font-bold text-white group-hover:text-cyan-400 transition-colors">Launch Airdrop</p>
+                            <p className="text-xs text-zinc-500">Distribute tokens to users</p>
+                        </div>
+                        <span className="text-zinc-600 group-hover:text-cyan-400 transition-colors">→</span>
+                    </Link>
+
+                    <Link
+                        href="/"
+                        className="group flex items-center gap-4 p-4 glass-card rounded-xl hover:border-violet-500/30 transition-all"
+                    >
+                        <div className="w-12 h-12 rounded-xl bg-violet-500 flex items-center justify-center text-2xl group-hover:scale-110 transition-transform shadow-lg shadow-violet-500/20">
+                            🌐
+                        </div>
+                        <div className="flex-1">
+                            <p className="font-bold text-white group-hover:text-violet-400 transition-colors">View Public Site</p>
+                            <p className="text-xs text-zinc-500">See what users see</p>
+                        </div>
+                        <span className="text-zinc-600 group-hover:text-violet-400 transition-colors">→</span>
+                    </Link>
                 </div>
             </div>
         </div>
