@@ -6,16 +6,19 @@ import { useState, useEffect, use } from "react";
 import { Connection, PublicKey, Transaction, SystemProgram, LAMPORTS_PER_SOL } from "@solana/web3.js";
 import { useRouter } from "next/navigation";
 
-// Use fallback logic
+// RPC endpoints - primary first, then fallbacks
+const PRIMARY_RPC = process.env.NEXT_PUBLIC_RPC_ENDPOINT;
 const FALLBACK_RPCS = [
-    process.env.NEXT_PUBLIC_RPC_ENDPOINT,
     "https://rpc.ankr.com/solana",
     "https://solana-mainnet.g.alchemy.com/v2/demo",
-    // "https://api.tatum.io/v3/blockchain/node/solana-mainnet", // Rate limited (5 req/min)
     "https://api.mainnet-beta.solana.com",
 ].filter(Boolean) as string[];
 
 const TREASURY_ADDRESS = process.env.NEXT_PUBLIC_TREASURY_ADDRESS;
+
+// Cache connection to avoid recreating on every buy
+let cachedConnection: Connection | null = null;
+let cachedRpcUrl: string | null = null;
 
 interface Raffle {
     id: number;
@@ -64,12 +67,28 @@ export default function RafflePage({ params }: { params: Promise<{ id: string }>
         }
     }, [resolvedParams.id, connected, publicKey]);
 
-    // Helper to find working connection
+    // Helper to get connection - uses primary RPC directly to save rate limit
     const getConnection = async () => {
+        // Return cached connection if available
+        if (cachedConnection && cachedRpcUrl) {
+            return cachedConnection;
+        }
+
+        // Try primary RPC first WITHOUT a test call (saves rate limit)
+        if (PRIMARY_RPC) {
+            const connection = new Connection(PRIMARY_RPC, "confirmed");
+            cachedConnection = connection;
+            cachedRpcUrl = PRIMARY_RPC;
+            return connection;
+        }
+
+        // Only try fallbacks with test call if no primary RPC
         for (const rpc of FALLBACK_RPCS) {
             try {
-                const connection = new Connection(rpc);
+                const connection = new Connection(rpc, "confirmed");
                 await connection.getLatestBlockhash("confirmed");
+                cachedConnection = connection;
+                cachedRpcUrl = rpc;
                 return connection;
             } catch (e) {
                 console.warn(`RPC ${rpc} failed, trying next...`);
