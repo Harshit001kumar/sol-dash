@@ -2,8 +2,11 @@
 
 import { useWallet } from "@solana/wallet-adapter-react";
 import { WalletMultiButton } from "@solana/wallet-adapter-react-ui";
-import { VersionedTransaction } from "@solana/web3.js";
+import { Connection, PublicKey, VersionedTransaction } from "@solana/web3.js";
 import { useState, useEffect, useCallback, useRef } from "react";
+
+const RPC_ENDPOINT = process.env.NEXT_PUBLIC_RPC_ENDPOINT || "https://api.mainnet-beta.solana.com";
+const SOL_MINT = "So11111111111111111111111111111111111111112";
 import Link from "next/link";
 
 // Default popular tokens (always shown at top)
@@ -72,6 +75,8 @@ export default function SwapPage() {
     const [slippage, setSlippage] = useState(50);
     const [customSlippage, setCustomSlippage] = useState("");
     const [showSlippage, setShowSlippage] = useState(false);
+    const [inputBalance, setInputBalance] = useState<string | null>(null);
+    const [balanceLoading, setBalanceLoading] = useState(false);
 
     // Token modal state
     const [tokenModal, setTokenModal] = useState<"input" | "output" | null>(null);
@@ -79,6 +84,51 @@ export default function SwapPage() {
     const [searchResults, setSearchResults] = useState<TokenInfo[]>([]);
     const [searchLoading, setSearchLoading] = useState(false);
     const searchRef = useRef<HTMLInputElement>(null);
+
+    // Fetch balance for input token
+    const fetchBalance = useCallback(async () => {
+        if (!connected || !publicKey) {
+            setInputBalance(null);
+            return;
+        }
+        setBalanceLoading(true);
+        try {
+            const connection = new Connection(RPC_ENDPOINT, "confirmed");
+            if (inputToken.address === SOL_MINT) {
+                const bal = await connection.getBalance(publicKey);
+                setInputBalance((bal / Math.pow(10, 9)).toFixed(4));
+            } else {
+                const mintPubkey = new PublicKey(inputToken.address);
+                const accounts = await connection.getParsedTokenAccountsByOwner(publicKey, { mint: mintPubkey });
+                if (accounts.value.length > 0) {
+                    const amount = accounts.value[0].account.data.parsed.info.tokenAmount.uiAmount;
+                    setInputBalance(amount?.toFixed(Math.min(inputToken.decimals, 6)) || "0");
+                } else {
+                    setInputBalance("0");
+                }
+            }
+        } catch (err) {
+            console.error("Balance fetch error:", err);
+            setInputBalance(null);
+        } finally {
+            setBalanceLoading(false);
+        }
+    }, [connected, publicKey, inputToken]);
+
+    useEffect(() => {
+        fetchBalance();
+    }, [fetchBalance]);
+
+    const handleMax = () => {
+        if (!inputBalance || inputBalance === "0") return;
+        // For SOL, leave a small amount for fees
+        if (inputToken.address === SOL_MINT) {
+            const maxSol = Math.max(0, parseFloat(inputBalance) - 0.01);
+            setInputAmount(maxSol > 0 ? maxSol.toFixed(4) : "0");
+        } else {
+            setInputAmount(inputBalance);
+        }
+    };
 
     // Focus search input when modal opens
     useEffect(() => {
@@ -231,6 +281,8 @@ export default function SwapPage() {
             setSwapMsg(`Swapped ${inputAmount} ${inputToken.symbol} → ${outputAmount} ${outputToken.symbol}`);
             setInputAmount("");
             setOrder(null);
+            // Refresh balance after swap
+            setTimeout(() => fetchBalance(), 2000);
         } catch (err: any) {
             console.error("Swap error:", err);
             setSwapStatus("error");
@@ -364,8 +416,10 @@ export default function SwapPage() {
                             <div className="flex items-center justify-between mb-3">
                                 <span className="text-[11px] uppercase tracking-widest text-emerald-400/70 font-bold">You Pay</span>
                                 <span className="text-[11px] text-zinc-500">
-                                    Balance: <span className="text-zinc-300">—</span>
-                                    <button className="ml-1.5 text-emerald-400 font-bold hover:text-emerald-300 transition-colors">MAX</button>
+                                    Balance: <span className="text-zinc-300">{balanceLoading ? "..." : inputBalance ?? "—"}</span>
+                                    {inputBalance && parseFloat(inputBalance) > 0 && (
+                                        <button onClick={handleMax} className="ml-1.5 text-emerald-400 font-bold hover:text-emerald-300 transition-colors">MAX</button>
+                                    )}
                                 </span>
                             </div>
                             <div className="flex items-center justify-between gap-3">
