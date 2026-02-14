@@ -2,47 +2,53 @@ import { NextRequest, NextResponse } from "next/server";
 
 export const dynamic = "force-dynamic";
 
-const JUPITER_API = "https://api.jup.ag/swap/v1";
-const FEE_ACCOUNT = process.env.NEXT_PUBLIC_TREASURY_ADDRESS;
+const JUPITER_ULTRA_API = "https://api.jup.ag/ultra/v1";
+const JUPITER_API_KEY = process.env.JUPITER_API_KEY || "";
 
+// POST /api/swap/execute — submit signed transaction via Ultra API
 export async function POST(request: NextRequest) {
     try {
         const body = await request.json();
-        const { quoteResponse, userPublicKey } = body;
+        const { signedTransaction, requestId } = body;
 
-        if (!quoteResponse || !userPublicKey) {
+        if (!signedTransaction || !requestId) {
             return NextResponse.json(
-                { error: "Missing quoteResponse or userPublicKey" },
+                { error: "Missing signedTransaction or requestId" },
                 { status: 400 }
             );
         }
 
-        const response = await fetch(`${JUPITER_API}/swap`, {
+        const headers: Record<string, string> = {
+            "Content-Type": "application/json",
+        };
+        if (JUPITER_API_KEY) {
+            headers["x-api-key"] = JUPITER_API_KEY;
+        }
+
+        const response = await fetch(`${JUPITER_ULTRA_API}/execute`, {
             method: "POST",
-            headers: { "Content-Type": "application/json" },
+            headers,
             body: JSON.stringify({
-                quoteResponse,
-                userPublicKey,
-                feeAccount: FEE_ACCOUNT,
-                dynamicComputeUnitLimit: true,
-                prioritizationFeeLamports: "auto",
+                signedTransaction,
+                requestId,
             }),
         });
 
         const data = await response.json();
 
         if (!response.ok) {
+            console.error("Jupiter Ultra execute error:", response.status, data);
             return NextResponse.json(
-                { error: data.error || "Failed to create swap transaction" },
+                { error: data.error || data.message || "Failed to execute swap" },
                 { status: response.status }
             );
         }
 
         return NextResponse.json(data);
     } catch (error) {
-        console.error("Jupiter swap error:", error);
+        console.error("Jupiter Ultra execute error:", error);
         return NextResponse.json(
-            { error: "Failed to create swap transaction" },
+            { error: "Failed to execute swap" },
             { status: 500 }
         );
     }
