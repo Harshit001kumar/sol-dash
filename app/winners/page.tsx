@@ -54,6 +54,7 @@ export default function WinnersPage() {
 
           <div className="hidden md:flex items-center gap-1 bg-[#111117] p-1 rounded-xl border border-white/5">
             <Link href="/" className="px-4 py-2 text-sm font-medium text-zinc-400 hover:text-white rounded-lg transition-colors">Raffles</Link>
+            <Link href="/swap" className="px-4 py-2 text-sm font-medium text-zinc-400 hover:text-white rounded-lg transition-colors">Swap</Link>
             <Link href="/profile" className="px-4 py-2 text-sm font-medium text-zinc-400 hover:text-white rounded-lg transition-colors">Profile</Link>
             <Link href="/winners" className="px-4 py-2 text-sm font-medium text-white bg-white/10 rounded-lg">Winners</Link>
           </div>
