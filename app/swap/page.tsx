@@ -613,12 +613,12 @@ export default function SwapPage() {
             )}
 
             {/* Slide-up animation */}
-            <style jsx>{`
+            <style dangerouslySetInnerHTML={{ __html: `
                 @keyframes slideUp {
                     from { transform: translateY(20px); opacity: 0; }
                     to { transform: translateY(0); opacity: 1; }
                 }
-            `}</style>
+            `}} />
 
             {/* Mobile Bottom Navigation */}
             <nav className="md:hidden fixed bottom-0 left-0 right-0 z-50 border-t border-white/5" style={{ background: "linear-gradient(180deg, #0d0d18 0%, #08080f 100%)" }}>
