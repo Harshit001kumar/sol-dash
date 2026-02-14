@@ -32,7 +32,19 @@ export async function GET(request: NextRequest) {
         }
 
         const data = await res.json();
-        return NextResponse.json(data);
+
+        // Normalize Jupiter's field names to match our frontend TokenInfo interface
+        const normalized = Array.isArray(data) ? data.map((token: any) => ({
+            address: token.id || token.address || "",
+            symbol: token.symbol || "",
+            name: token.name || "",
+            decimals: token.decimals ?? 6,
+            logoURI: token.icon || token.logoURI || "",
+            tags: token.tags || [],
+            isVerified: token.isVerified || false,
+        })) : [];
+
+        return NextResponse.json(normalized);
     } catch (error) {
         console.error("Token search error:", error);
         return NextResponse.json([]);
