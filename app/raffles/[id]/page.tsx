@@ -193,6 +193,15 @@ export default function RafflePage({ params }: { params: Promise<{ id: string }>
                                 <span className="text-zinc-400">Time Remaining</span>
                                 <span className="font-bold text-red-400">{hoursLeft} Hours</span>
                             </div>
+                            <div className="flex justify-between p-4 bg-white/5 rounded-xl">
+                                <span className="text-zinc-400">Ends At</span>
+                                <span className="font-bold text-zinc-300 text-sm">
+                                    {endTime.toLocaleString(undefined, {
+                                        dateStyle: "medium",
+                                        timeStyle: "short"
+                                    })}
+                                </span>
+                            </div>
                         </div>
                     </div>
 
