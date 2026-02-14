@@ -66,6 +66,7 @@ export default function SwapPage() {
             );
             const data = await res.json();
             if (res.ok && data.outAmount) {
+                // Store the order (may have error like "Insufficient funds" but still has quote data)
                 setOrder(data);
             } else {
                 console.error("Quote response error:", data);
@@ -110,21 +111,24 @@ export default function SwapPage() {
         setSwapMsg("Preparing transaction...");
 
         try {
-            // If order doesn't have a transaction, re-fetch with taker
-            let txBase64 = order.transaction;
-            let requestId = order.requestId;
+            // Always re-fetch the order with taker to get a fresh transaction
+            const rawAmount = Math.floor(parseFloat(inputAmount) * Math.pow(10, inputToken.decimals));
+            const res = await fetch(
+                `/api/swap/quote?inputMint=${inputToken.mint}&outputMint=${outputToken.mint}&amount=${rawAmount}&taker=${publicKey.toBase58()}`
+            );
+            const data = await res.json();
 
-            if (!txBase64) {
-                // Re-fetch the order with the taker to get the transaction
-                const rawAmount = Math.floor(parseFloat(inputAmount) * Math.pow(10, inputToken.decimals));
-                const res = await fetch(
-                    `/api/swap/quote?inputMint=${inputToken.mint}&outputMint=${outputToken.mint}&amount=${rawAmount}&taker=${publicKey.toBase58()}`
-                );
-                const data = await res.json();
-                if (!res.ok || !data.transaction) throw new Error("Failed to get swap transaction");
-                txBase64 = data.transaction;
-                requestId = data.requestId;
+            // Check for errors from Jupiter (e.g. insufficient funds)
+            if (data.error || data.errorMessage) {
+                throw new Error(data.error || data.errorMessage);
             }
+
+            if (!res.ok || !data.transaction) {
+                throw new Error("Failed to get swap transaction. Make sure you have enough balance.");
+            }
+
+            const txBase64 = data.transaction;
+            const requestId = data.requestId;
 
             // Deserialize and sign
             setSwapStatus("signing");
