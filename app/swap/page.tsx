@@ -2,7 +2,7 @@
 
 import { useWallet } from "@solana/wallet-adapter-react";
 import { WalletMultiButton } from "@solana/wallet-adapter-react-ui";
-import { Connection, VersionedTransaction } from "@solana/web3.js";
+import { VersionedTransaction } from "@solana/web3.js";
 import { useState, useEffect, useCallback } from "react";
 import Link from "next/link";
 
@@ -14,22 +14,24 @@ const TOKENS = [
     { symbol: "BONK", name: "Bonk", mint: "DezXAZ8z7PnrnRJjz3wXBoRgixCa6xjnB7YaB1pPB263", decimals: 5, logo: "🐕", color: "#F2A900" },
 ];
 
-const RPC_ENDPOINT = process.env.NEXT_PUBLIC_RPC_ENDPOINT || "https://api.mainnet-beta.solana.com";
-
 const SLIPPAGE_OPTIONS = [
     { label: "0.5%", value: 50 },
     { label: "1%", value: 100 },
     { label: "3%", value: 300 },
 ];
 
-interface QuoteData {
+interface OrderData {
+    requestId: string;
     inputMint: string;
     outputMint: string;
     inAmount: string;
     outAmount: string;
+    otherAmountThreshold: string;
+    swapType: string;
+    slippageBps: number;
     priceImpactPct: string;
     routePlan: any[];
-    otherAmountThreshold: string;
+    transaction: string; // base64 unsigned transaction
 }
 
 export default function SwapPage() {
@@ -38,7 +40,7 @@ export default function SwapPage() {
     const [inputToken, setInputToken] = useState(TOKENS[0]);
     const [outputToken, setOutputToken] = useState(TOKENS[1]);
     const [inputAmount, setInputAmount] = useState("");
-    const [quote, setQuote] = useState<QuoteData | null>(null);
+    const [order, setOrder] = useState<OrderData | null>(null);
     const [quoteLoading, setQuoteLoading] = useState(false);
     const [swapStatus, setSwapStatus] = useState<"idle" | "loading" | "signing" | "confirming" | "success" | "error">("idle");
     const [swapMsg, setSwapMsg] = useState("");
@@ -48,44 +50,47 @@ export default function SwapPage() {
     const [showInputTokens, setShowInputTokens] = useState(false);
     const [showOutputTokens, setShowOutputTokens] = useState(false);
 
-    // Debounced quote fetch
-    const fetchQuote = useCallback(async (amount: string) => {
+    // Debounced order fetch (Ultra API returns quote + transaction together)
+    const fetchOrder = useCallback(async (amount: string) => {
         if (!amount || parseFloat(amount) <= 0) {
-            setQuote(null);
+            setOrder(null);
             return;
         }
         setQuoteLoading(true);
         try {
             const rawAmount = Math.floor(parseFloat(amount) * Math.pow(10, inputToken.decimals));
+            // Pass taker (wallet) if connected, so we also get the transaction
+            const takerParam = publicKey ? `&taker=${publicKey.toBase58()}` : "";
             const res = await fetch(
-                `/api/swap/quote?inputMint=${inputToken.mint}&outputMint=${outputToken.mint}&amount=${rawAmount}&slippageBps=${slippage}`
+                `/api/swap/quote?inputMint=${inputToken.mint}&outputMint=${outputToken.mint}&amount=${rawAmount}${takerParam}`
             );
             const data = await res.json();
             if (res.ok && data.outAmount) {
-                setQuote(data);
+                setOrder(data);
             } else {
-                setQuote(null);
+                console.error("Quote response error:", data);
+                setOrder(null);
             }
         } catch (err) {
             console.error("Quote error:", err);
-            setQuote(null);
+            setOrder(null);
         } finally {
             setQuoteLoading(false);
         }
-    }, [inputToken, outputToken, slippage]);
+    }, [inputToken, outputToken, publicKey]);
 
     useEffect(() => {
-        const timeout = setTimeout(() => fetchQuote(inputAmount), 500);
+        const timeout = setTimeout(() => fetchOrder(inputAmount), 500);
         return () => clearTimeout(timeout);
-    }, [inputAmount, fetchQuote]);
+    }, [inputAmount, fetchOrder]);
 
-    const outputAmount = quote
-        ? (parseInt(quote.outAmount) / Math.pow(10, outputToken.decimals)).toFixed(outputToken.decimals > 6 ? 4 : 2)
+    const outputAmount = order
+        ? (parseInt(order.outAmount) / Math.pow(10, outputToken.decimals)).toFixed(outputToken.decimals > 6 ? 4 : 2)
         : "";
 
-    const priceImpact = quote ? parseFloat(quote.priceImpactPct) : 0;
+    const priceImpact = order?.priceImpactPct ? parseFloat(order.priceImpactPct) : 0;
 
-    const exchangeRate = quote && inputAmount
+    const exchangeRate = order && inputAmount
         ? (parseFloat(outputAmount) / parseFloat(inputAmount)).toFixed(2)
         : "";
 
@@ -94,49 +99,72 @@ export default function SwapPage() {
         setInputToken(outputToken);
         setOutputToken(temp);
         setInputAmount(outputAmount || "");
-        setQuote(null);
+        setOrder(null);
     };
 
+    // Execute swap via Ultra API
     const handleSwap = async () => {
-        if (!connected || !publicKey || !signTransaction || !quote) return;
+        if (!connected || !publicKey || !signTransaction || !order) return;
+
         setSwapStatus("loading");
         setSwapMsg("Preparing transaction...");
-        try {
-            const res = await fetch("/api/swap/execute", {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({
-                    quoteResponse: quote,
-                    userPublicKey: publicKey.toBase58(),
-                }),
-            });
-            const data = await res.json();
-            if (!res.ok) throw new Error(data.error || "Failed to get swap transaction");
 
+        try {
+            // If order doesn't have a transaction, re-fetch with taker
+            let txBase64 = order.transaction;
+            let requestId = order.requestId;
+
+            if (!txBase64) {
+                // Re-fetch the order with the taker to get the transaction
+                const rawAmount = Math.floor(parseFloat(inputAmount) * Math.pow(10, inputToken.decimals));
+                const res = await fetch(
+                    `/api/swap/quote?inputMint=${inputToken.mint}&outputMint=${outputToken.mint}&amount=${rawAmount}&taker=${publicKey.toBase58()}`
+                );
+                const data = await res.json();
+                if (!res.ok || !data.transaction) throw new Error("Failed to get swap transaction");
+                txBase64 = data.transaction;
+                requestId = data.requestId;
+            }
+
+            // Deserialize and sign
             setSwapStatus("signing");
             setSwapMsg("Please approve in your wallet...");
-            const swapTransaction = data.swapTransaction;
-            const transactionBuf = Buffer.from(swapTransaction, "base64");
+
+            const transactionBuf = Buffer.from(txBase64, "base64");
             const transaction = VersionedTransaction.deserialize(transactionBuf);
             const signedTransaction = await signTransaction(transaction);
 
+            // Submit to Jupiter Ultra execute endpoint
             setSwapStatus("confirming");
-            setSwapMsg("Sending transaction...");
-            const connection = new Connection(RPC_ENDPOINT, "confirmed");
-            const rawTransaction = signedTransaction.serialize();
-            const txid = await connection.sendRawTransaction(rawTransaction, {
-                skipPreflight: true,
-                maxRetries: 2,
+            setSwapMsg("Sending transaction to Jupiter...");
+
+            const serialized = Buffer.from(signedTransaction.serialize()).toString("base64");
+
+            const executeRes = await fetch("/api/swap/execute", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                    signedTransaction: serialized,
+                    requestId,
+                }),
             });
 
-            setSwapMsg("Confirming transaction...");
-            const confirmation = await connection.confirmTransaction(txid, "confirmed");
-            if (confirmation.value.err) throw new Error("Transaction failed on-chain");
+            const executeData = await executeRes.json();
+
+            if (!executeRes.ok) {
+                throw new Error(executeData.error || "Swap execution failed");
+            }
+
+            // Check status from Jupiter
+            if (executeData.status === "Failed") {
+                throw new Error(executeData.error || "Transaction failed on-chain");
+            }
 
             setSwapStatus("success");
             setSwapMsg(`Swapped ${inputAmount} ${inputToken.symbol} → ${outputAmount} ${outputToken.symbol}`);
             setInputAmount("");
-            setQuote(null);
+            setOrder(null);
+
         } catch (err: any) {
             console.error("Swap error:", err);
             setSwapStatus("error");
@@ -181,7 +209,7 @@ export default function SwapPage() {
                         {TOKENS.filter(t => t.mint !== exclude).map(token => (
                             <button
                                 key={token.mint}
-                                onClick={() => { onSelect(token); setShow(false); setQuote(null); }}
+                                onClick={() => { onSelect(token); setShow(false); setOrder(null); }}
                                 className="w-full flex items-center gap-3 px-4 py-3 hover:bg-white/5 transition-colors text-left"
                             >
                                 <span
@@ -366,7 +394,7 @@ export default function SwapPage() {
                         </div>
 
                         {/* Exchange Rate */}
-                        {quote && (
+                        {order && (
                             <div className="flex items-center justify-between mt-4 px-1">
                                 <div className="flex items-center gap-2 text-sm text-zinc-400">
                                     <span className="text-zinc-600">⇄</span>
@@ -385,7 +413,7 @@ export default function SwapPage() {
                                 <div className="w-full flex justify-center">
                                     <WalletMultiButton />
                                 </div>
-                            ) : !inputAmount || !quote ? (
+                            ) : !inputAmount || !order ? (
                                 <button
                                     disabled
                                     className="w-full py-4 md:py-5 rounded-2xl text-zinc-500 font-black text-base md:text-lg tracking-widest uppercase cursor-not-allowed transition-all"
@@ -423,7 +451,7 @@ export default function SwapPage() {
                 )}
 
                 {/* Swap Details */}
-                {quote && (
+                {order && (
                     <div className="mt-5">
                         <div className="flex items-center gap-3 mb-4">
                             <p className="text-[11px] uppercase tracking-widest text-emerald-400/70 font-bold">Swap Details</p>
@@ -446,11 +474,11 @@ export default function SwapPage() {
                                         <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" /></svg>
                                     </button>
                                 </div>
-                                <span className="text-sm text-zinc-300 font-medium">{slippage / 100}%</span>
+                                <span className="text-sm text-zinc-300 font-medium">{order.slippageBps ? order.slippageBps / 100 : slippage / 100}%</span>
                             </div>
                             <div className="flex items-center justify-between">
-                                <span className="text-sm text-zinc-400">Platform Fee</span>
-                                <span className="text-sm text-zinc-300 font-medium">0.5%</span>
+                                <span className="text-sm text-zinc-400">Swap Type</span>
+                                <span className="text-sm text-zinc-300 font-medium capitalize">{order.swapType || "Aggregator"}</span>
                             </div>
                             <div className="flex items-center justify-between">
                                 <span className="text-sm text-zinc-400">Network Fee</span>
@@ -461,11 +489,11 @@ export default function SwapPage() {
                 )}
 
                 {/* Price Card */}
-                {quote && (
+                {order && (
                     <div className="mt-6 rounded-2xl p-5 border border-white/5" style={{ background: "linear-gradient(135deg, #111119 0%, #0d0d18 100%)" }}>
                         <div className="flex items-center gap-2 mb-2">
                             <span className="text-xs text-zinc-500 font-bold uppercase tracking-widest">{inputToken.symbol}/{outputToken.symbol}</span>
-                            <span className="text-xs text-emerald-400 font-bold">via Jupiter</span>
+                            <span className="text-xs text-emerald-400 font-bold">via Jupiter Ultra</span>
                         </div>
                         <div className="flex items-center justify-between">
                             <p className="text-2xl md:text-3xl font-black text-white">
@@ -494,7 +522,7 @@ export default function SwapPage() {
                 {/* Desktop footer */}
                 <div className="hidden md:block mt-8 text-center">
                     <p className="text-xs text-zinc-600">
-                        Powered by Jupiter Aggregator • 0.5% Platform Fee
+                        Powered by Jupiter Ultra • Best execution guaranteed
                     </p>
                 </div>
             </main>
