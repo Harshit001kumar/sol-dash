@@ -3,16 +3,31 @@
 import { useWallet } from "@solana/wallet-adapter-react";
 import { WalletMultiButton } from "@solana/wallet-adapter-react-ui";
 import { VersionedTransaction } from "@solana/web3.js";
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import Link from "next/link";
 
-// Popular Solana tokens
-const TOKENS = [
-    { symbol: "SOL", name: "Solana", mint: "So11111111111111111111111111111111111111112", decimals: 9, logo: "◎", color: "#9945FF" },
-    { symbol: "USDC", name: "USD Coin", mint: "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v", decimals: 6, logo: "$", color: "#2775CA" },
-    { symbol: "USDT", name: "Tether", mint: "Es9vMFrzaCERmJfrF4H2FYD4KCoNkY11McCe8BenwNYB", decimals: 6, logo: "₮", color: "#26A17B" },
-    { symbol: "BONK", name: "Bonk", mint: "DezXAZ8z7PnrnRJjz3wXBoRgixCa6xjnB7YaB1pPB263", decimals: 5, logo: "🐕", color: "#F2A900" },
+// Default popular tokens (always shown at top)
+const POPULAR_TOKENS = [
+    { symbol: "SOL", name: "Solana", address: "So11111111111111111111111111111111111111112", decimals: 9, logoURI: "", tags: ["verified"] },
+    { symbol: "USDC", name: "USD Coin", address: "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v", decimals: 6, logoURI: "", tags: ["verified"] },
+    { symbol: "USDT", name: "Tether", address: "Es9vMFrzaCERmJfrF4H2FYD4KCoNkY11McCe8BenwNYB", decimals: 6, logoURI: "", tags: ["verified"] },
+    { symbol: "BONK", name: "Bonk", address: "DezXAZ8z7PnrnRJjz3wXBoRgixCa6xjnB7YaB1pPB263", decimals: 5, logoURI: "", tags: ["verified"] },
+    { symbol: "JUP", name: "Jupiter", address: "JUPyiwrYJFskUPiHa7hkeR8VUtAeFoSYbKedZNsDvCN", decimals: 6, logoURI: "", tags: ["verified"] },
+    { symbol: "WIF", name: "dogwifhat", address: "EKpQGSJtjMFqKZ9KQanSqYXRcF8fBopzLHYxdM65zcjm", decimals: 6, logoURI: "", tags: ["verified"] },
+    { symbol: "PYTH", name: "Pyth Network", address: "HZ1JovNiVvGrGNiiYvEozEVgZ58xaU3RKwX8eACQBCt3", decimals: 6, logoURI: "", tags: ["verified"] },
+    { symbol: "RAY", name: "Raydium", address: "4k3Dyjzvzp8eMZWUXbBCjEvwSkkk59S5iCNLY3QrkX6R", decimals: 6, logoURI: "", tags: ["verified"] },
+    { symbol: "ORCA", name: "Orca", address: "orcaEKTdK7LKz57vaAYr9QeNsVEPfiu6QeMU1kektZE", decimals: 6, logoURI: "", tags: ["verified"] },
+    { symbol: "RENDER", name: "Render", address: "rndrizKT3MK1iimdxRdWabcF7Zg7AR5T4nud4EkHBof", decimals: 8, logoURI: "", tags: ["verified"] },
 ];
+
+interface TokenInfo {
+    symbol: string;
+    name: string;
+    address: string;
+    decimals: number;
+    logoURI: string;
+    tags?: string[];
+}
 
 const SLIPPAGE_OPTIONS = [
     { label: "0.5%", value: 50 },
@@ -31,14 +46,24 @@ interface OrderData {
     slippageBps: number;
     priceImpactPct: string;
     routePlan: any[];
-    transaction: string; // base64 unsigned transaction
+    transaction: string;
+    error?: string;
+    errorMessage?: string;
+}
+
+// Color generator for tokens without logos
+function tokenColor(symbol: string): string {
+    const colors = ["#9945FF", "#14F195", "#2775CA", "#26A17B", "#F2A900", "#E84142", "#627EEA", "#FF6B6B", "#4ECDC4", "#45B7D1"];
+    let hash = 0;
+    for (let i = 0; i < symbol.length; i++) hash = symbol.charCodeAt(i) + ((hash << 5) - hash);
+    return colors[Math.abs(hash) % colors.length];
 }
 
 export default function SwapPage() {
     const { publicKey, signTransaction, connected } = useWallet();
 
-    const [inputToken, setInputToken] = useState(TOKENS[0]);
-    const [outputToken, setOutputToken] = useState(TOKENS[1]);
+    const [inputToken, setInputToken] = useState<TokenInfo>(POPULAR_TOKENS[0]);
+    const [outputToken, setOutputToken] = useState<TokenInfo>(POPULAR_TOKENS[1]);
     const [inputAmount, setInputAmount] = useState("");
     const [order, setOrder] = useState<OrderData | null>(null);
     const [quoteLoading, setQuoteLoading] = useState(false);
@@ -47,10 +72,49 @@ export default function SwapPage() {
     const [slippage, setSlippage] = useState(50);
     const [customSlippage, setCustomSlippage] = useState("");
     const [showSlippage, setShowSlippage] = useState(false);
-    const [showInputTokens, setShowInputTokens] = useState(false);
-    const [showOutputTokens, setShowOutputTokens] = useState(false);
 
-    // Debounced order fetch (Ultra API returns quote + transaction together)
+    // Token modal state
+    const [tokenModal, setTokenModal] = useState<"input" | "output" | null>(null);
+    const [tokenSearch, setTokenSearch] = useState("");
+    const [searchResults, setSearchResults] = useState<TokenInfo[]>([]);
+    const [searchLoading, setSearchLoading] = useState(false);
+    const searchRef = useRef<HTMLInputElement>(null);
+
+    // Focus search input when modal opens
+    useEffect(() => {
+        if (tokenModal && searchRef.current) {
+            setTimeout(() => searchRef.current?.focus(), 100);
+        }
+        if (tokenModal) {
+            setTokenSearch("");
+            setSearchResults([]);
+        }
+    }, [tokenModal]);
+
+    // Debounced token search
+    useEffect(() => {
+        if (!tokenSearch || tokenSearch.length < 2) {
+            setSearchResults([]);
+            return;
+        }
+        const timeout = setTimeout(async () => {
+            setSearchLoading(true);
+            try {
+                const res = await fetch(`/api/swap/tokens?query=${encodeURIComponent(tokenSearch)}`);
+                const data = await res.json();
+                if (Array.isArray(data)) {
+                    setSearchResults(data.slice(0, 20));
+                }
+            } catch (err) {
+                console.error("Token search error:", err);
+            } finally {
+                setSearchLoading(false);
+            }
+        }, 300);
+        return () => clearTimeout(timeout);
+    }, [tokenSearch]);
+
+    // Debounced order fetch
     const fetchOrder = useCallback(async (amount: string) => {
         if (!amount || parseFloat(amount) <= 0) {
             setOrder(null);
@@ -59,17 +123,14 @@ export default function SwapPage() {
         setQuoteLoading(true);
         try {
             const rawAmount = Math.floor(parseFloat(amount) * Math.pow(10, inputToken.decimals));
-            // Pass taker (wallet) if connected, so we also get the transaction
             const takerParam = publicKey ? `&taker=${publicKey.toBase58()}` : "";
             const res = await fetch(
-                `/api/swap/quote?inputMint=${inputToken.mint}&outputMint=${outputToken.mint}&amount=${rawAmount}${takerParam}`
+                `/api/swap/quote?inputMint=${inputToken.address}&outputMint=${outputToken.address}&amount=${rawAmount}${takerParam}`
             );
             const data = await res.json();
             if (res.ok && data.outAmount) {
-                // Store the order (may have error like "Insufficient funds" but still has quote data)
                 setOrder(data);
             } else {
-                console.error("Quote response error:", data);
                 setOrder(null);
             }
         } catch (err) {
@@ -86,13 +147,13 @@ export default function SwapPage() {
     }, [inputAmount, fetchOrder]);
 
     const outputAmount = order
-        ? (parseInt(order.outAmount) / Math.pow(10, outputToken.decimals)).toFixed(outputToken.decimals > 6 ? 4 : 2)
+        ? (parseInt(order.outAmount) / Math.pow(10, outputToken.decimals)).toFixed(Math.min(outputToken.decimals, 6))
         : "";
 
     const priceImpact = order?.priceImpactPct ? parseFloat(order.priceImpactPct) : 0;
 
-    const exchangeRate = order && inputAmount
-        ? (parseFloat(outputAmount) / parseFloat(inputAmount)).toFixed(2)
+    const exchangeRate = order && inputAmount && parseFloat(inputAmount) > 0
+        ? (parseFloat(outputAmount) / parseFloat(inputAmount)).toFixed(4)
         : "";
 
     const handleFlip = () => {
@@ -103,6 +164,22 @@ export default function SwapPage() {
         setOrder(null);
     };
 
+    const selectToken = (token: TokenInfo) => {
+        if (tokenModal === "input") {
+            if (token.address === outputToken.address) {
+                setOutputToken(inputToken);
+            }
+            setInputToken(token);
+        } else if (tokenModal === "output") {
+            if (token.address === inputToken.address) {
+                setInputToken(outputToken);
+            }
+            setOutputToken(token);
+        }
+        setOrder(null);
+        setTokenModal(null);
+    };
+
     // Execute swap via Ultra API
     const handleSwap = async () => {
         if (!connected || !publicKey || !signTransaction || !order) return;
@@ -111,18 +188,15 @@ export default function SwapPage() {
         setSwapMsg("Preparing transaction...");
 
         try {
-            // Always re-fetch the order with taker to get a fresh transaction
             const rawAmount = Math.floor(parseFloat(inputAmount) * Math.pow(10, inputToken.decimals));
             const res = await fetch(
-                `/api/swap/quote?inputMint=${inputToken.mint}&outputMint=${outputToken.mint}&amount=${rawAmount}&taker=${publicKey.toBase58()}`
+                `/api/swap/quote?inputMint=${inputToken.address}&outputMint=${outputToken.address}&amount=${rawAmount}&taker=${publicKey.toBase58()}`
             );
             const data = await res.json();
 
-            // Check for errors from Jupiter (e.g. insufficient funds)
             if (data.error || data.errorMessage) {
                 throw new Error(data.error || data.errorMessage);
             }
-
             if (!res.ok || !data.transaction) {
                 throw new Error("Failed to get swap transaction. Make sure you have enough balance.");
             }
@@ -130,7 +204,6 @@ export default function SwapPage() {
             const txBase64 = data.transaction;
             const requestId = data.requestId;
 
-            // Deserialize and sign
             setSwapStatus("signing");
             setSwapMsg("Please approve in your wallet...");
 
@@ -138,7 +211,6 @@ export default function SwapPage() {
             const transaction = VersionedTransaction.deserialize(transactionBuf);
             const signedTransaction = await signTransaction(transaction);
 
-            // Submit to Jupiter Ultra execute endpoint
             setSwapStatus("confirming");
             setSwapMsg("Sending transaction to Jupiter...");
 
@@ -147,28 +219,18 @@ export default function SwapPage() {
             const executeRes = await fetch("/api/swap/execute", {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({
-                    signedTransaction: serialized,
-                    requestId,
-                }),
+                body: JSON.stringify({ signedTransaction: serialized, requestId }),
             });
 
             const executeData = await executeRes.json();
 
-            if (!executeRes.ok) {
-                throw new Error(executeData.error || "Swap execution failed");
-            }
-
-            // Check status from Jupiter
-            if (executeData.status === "Failed") {
-                throw new Error(executeData.error || "Transaction failed on-chain");
-            }
+            if (!executeRes.ok) throw new Error(executeData.error || "Swap execution failed");
+            if (executeData.status === "Failed") throw new Error(executeData.error || "Transaction failed on-chain");
 
             setSwapStatus("success");
             setSwapMsg(`Swapped ${inputAmount} ${inputToken.symbol} → ${outputAmount} ${outputToken.symbol}`);
             setInputAmount("");
             setOrder(null);
-
         } catch (err: any) {
             console.error("Swap error:", err);
             setSwapStatus("error");
@@ -176,67 +238,43 @@ export default function SwapPage() {
         }
     };
 
-    // Token dropdown
-    const TokenDropdown = ({
-        selected,
-        onSelect,
-        show,
-        setShow,
-        exclude,
-    }: {
-        selected: typeof TOKENS[0];
-        onSelect: (t: typeof TOKENS[0]) => void;
-        show: boolean;
-        setShow: (v: boolean) => void;
-        exclude: string;
-    }) => (
-        <div className="relative">
-            <button
-                onClick={() => setShow(!show)}
-                className="flex items-center gap-2.5 pl-2 pr-3 py-2 rounded-full bg-[#1c1c2e] hover:bg-[#252540] border border-white/5 transition-all"
+    // Token avatar component
+    const TokenAvatar = ({ token, size = "w-8 h-8" }: { token: TokenInfo; size?: string }) => {
+        const color = tokenColor(token.symbol);
+        return token.logoURI ? (
+            <img src={token.logoURI} alt={token.symbol} className={`${size} rounded-full`} onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; (e.target as HTMLImageElement).nextElementSibling && ((e.target as HTMLImageElement).nextElementSibling as HTMLElement).style.removeProperty('display'); }} />
+        ) : (
+            <span
+                className={`${size} rounded-full flex items-center justify-center text-xs font-black shrink-0`}
+                style={{ background: `linear-gradient(135deg, ${color}40, ${color}20)`, color }}
             >
-                <span
-                    className="w-8 h-8 rounded-full flex items-center justify-center text-base font-bold shadow-lg"
-                    style={{ background: `linear-gradient(135deg, ${selected.color}40, ${selected.color}20)`, color: selected.color, boxShadow: `0 0 12px ${selected.color}30` }}
-                >
-                    {selected.logo}
-                </span>
-                <span className="font-bold text-white text-base tracking-wide">{selected.symbol}</span>
-                <svg className="w-3 h-3 text-zinc-500" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M19 9l-7 7-7-7" /></svg>
-            </button>
+                {token.symbol.slice(0, 2)}
+            </span>
+        );
+    };
 
-            {show && (
-                <>
-                    <div className="fixed inset-0 z-40" onClick={() => setShow(false)} />
-                    <div className="absolute top-full mt-2 left-0 w-52 bg-[#13131f] border border-white/10 rounded-2xl overflow-hidden shadow-2xl z-50 backdrop-blur-xl">
-                        <p className="px-4 pt-3 pb-2 text-[10px] uppercase tracking-widest text-zinc-600 font-bold">Select Token</p>
-                        {TOKENS.filter(t => t.mint !== exclude).map(token => (
-                            <button
-                                key={token.mint}
-                                onClick={() => { onSelect(token); setShow(false); setOrder(null); }}
-                                className="w-full flex items-center gap-3 px-4 py-3 hover:bg-white/5 transition-colors text-left"
-                            >
-                                <span
-                                    className="w-8 h-8 rounded-full flex items-center justify-center text-sm font-bold"
-                                    style={{ background: `${token.color}25`, color: token.color }}
-                                >
-                                    {token.logo}
-                                </span>
-                                <div>
-                                    <p className="font-bold text-white text-sm">{token.symbol}</p>
-                                    <p className="text-zinc-600 text-[11px]">{token.name}</p>
-                                </div>
-                            </button>
-                        ))}
-                    </div>
-                </>
-            )}
-        </div>
+    // Token button (opens modal)
+    const TokenButton = ({ token, side }: { token: TokenInfo; side: "input" | "output" }) => (
+        <button
+            onClick={() => setTokenModal(side)}
+            className="flex items-center gap-2.5 pl-2 pr-3 py-2 rounded-full bg-[#1c1c2e] hover:bg-[#252540] border border-white/5 transition-all shrink-0"
+        >
+            <TokenAvatar token={token} />
+            <span className="font-bold text-white text-base tracking-wide">{token.symbol}</span>
+            <svg className="w-3 h-3 text-zinc-500" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M19 9l-7 7-7-7" /></svg>
+        </button>
     );
+
+    // Tokens to show in modal (popular + search results)
+    const displayedTokens = tokenSearch.length >= 2
+        ? searchResults
+        : POPULAR_TOKENS;
+
+    const excludeMint = tokenModal === "input" ? outputToken.address : inputToken.address;
 
     return (
         <div className="min-h-screen text-white" style={{ background: "linear-gradient(180deg, #08080f 0%, #0d0d1a 40%, #0a0a14 100%)" }}>
-            {/* Ambient glow effects */}
+            {/* Ambient glow */}
             <div className="fixed top-0 left-1/2 -translate-x-1/2 w-[600px] h-[600px] rounded-full opacity-[0.03] pointer-events-none" style={{ background: "radial-gradient(circle, #9945FF 0%, transparent 70%)" }} />
             <div className="fixed bottom-0 right-0 w-[400px] h-[400px] rounded-full opacity-[0.02] pointer-events-none" style={{ background: "radial-gradient(circle, #14F195 0%, transparent 70%)" }} />
 
@@ -249,14 +287,12 @@ export default function SwapPage() {
                         </div>
                         <span className="font-bold text-lg text-white tracking-tight">SOLSWAP</span>
                     </Link>
-
                     <div className="flex items-center gap-1 bg-[#111119] p-1 rounded-xl border border-white/5">
                         <Link href="/" className="px-4 py-2 text-sm font-medium text-zinc-400 hover:text-white rounded-lg transition-colors">Raffles</Link>
                         <Link href="/swap" className="px-4 py-2 text-sm font-medium text-white bg-white/10 rounded-lg">Swap</Link>
                         <Link href="/profile" className="px-4 py-2 text-sm font-medium text-zinc-400 hover:text-white rounded-lg transition-colors">Profile</Link>
                         <Link href="/winners" className="px-4 py-2 text-sm font-medium text-zinc-400 hover:text-white rounded-lg transition-colors">Winners</Link>
                     </div>
-
                     <WalletMultiButton />
                 </div>
             </nav>
@@ -269,20 +305,18 @@ export default function SwapPage() {
                     </div>
                     <span className="font-black text-lg tracking-tight">SOLSWAP</span>
                 </div>
-                <div className="flex items-center gap-2">
-                    <button
-                        onClick={() => setShowSlippage(!showSlippage)}
-                        className="w-10 h-10 rounded-full bg-[#13131f] border border-white/5 flex items-center justify-center text-zinc-400 hover:text-white transition-colors"
-                    >
-                        <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.066 2.573c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.573 1.066c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.066-2.573c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" /><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" /></svg>
-                    </button>
-                </div>
+                <button
+                    onClick={() => setShowSlippage(!showSlippage)}
+                    className="w-10 h-10 rounded-full bg-[#13131f] border border-white/5 flex items-center justify-center text-zinc-400 hover:text-white transition-colors"
+                >
+                    <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.066 2.573c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.573 1.066c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.066-2.573c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" /><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" /></svg>
+                </button>
             </div>
 
             {/* Main Content */}
             <main className="max-w-md mx-auto px-4 pt-4 md:pt-10 pb-28 md:pb-12">
 
-                {/* Slippage Settings Panel */}
+                {/* Slippage Settings */}
                 {showSlippage && (
                     <div className="mb-4 p-5 rounded-2xl border border-white/5 backdrop-blur-sm" style={{ background: "linear-gradient(135deg, #13131f 0%, #111119 100%)" }}>
                         <div className="flex items-center justify-between mb-4">
@@ -335,13 +369,7 @@ export default function SwapPage() {
                                 </span>
                             </div>
                             <div className="flex items-center justify-between gap-3">
-                                <TokenDropdown
-                                    selected={inputToken}
-                                    onSelect={setInputToken}
-                                    show={showInputTokens}
-                                    setShow={(v) => { setShowInputTokens(v); setShowOutputTokens(false); }}
-                                    exclude={outputToken.mint}
-                                />
+                                <TokenButton token={inputToken} side="input" />
                                 <input
                                     type="number"
                                     placeholder="0.0"
@@ -357,11 +385,7 @@ export default function SwapPage() {
                             <button
                                 onClick={handleFlip}
                                 className="w-11 h-11 rounded-xl flex items-center justify-center border-[3px] transition-all duration-300 hover:scale-110 group"
-                                style={{
-                                    background: "linear-gradient(135deg, #1a1a2e, #13131f)",
-                                    borderColor: "#0d0d18",
-                                    boxShadow: "0 4px 12px rgba(0,0,0,0.5)"
-                                }}
+                                style={{ background: "linear-gradient(135deg, #1a1a2e, #13131f)", borderColor: "#0d0d18", boxShadow: "0 4px 12px rgba(0,0,0,0.5)" }}
                             >
                                 <span className="text-emerald-400 group-hover:text-white transition-colors text-lg">⇅</span>
                             </button>
@@ -371,18 +395,10 @@ export default function SwapPage() {
                         <div className="rounded-2xl p-4" style={{ background: "linear-gradient(135deg, #161622 0%, #13131f 100%)" }}>
                             <div className="flex items-center justify-between mb-3">
                                 <span className="text-[11px] uppercase tracking-widest text-emerald-400/70 font-bold">You Receive</span>
-                                <span className="text-[11px] text-zinc-500">
-                                    Balance: <span className="text-zinc-300">—</span>
-                                </span>
+                                <span className="text-[11px] text-zinc-500">Balance: <span className="text-zinc-300">—</span></span>
                             </div>
                             <div className="flex items-center justify-between gap-3">
-                                <TokenDropdown
-                                    selected={outputToken}
-                                    onSelect={setOutputToken}
-                                    show={showOutputTokens}
-                                    setShow={(v) => { setShowOutputTokens(v); setShowInputTokens(false); }}
-                                    exclude={inputToken.mint}
-                                />
+                                <TokenButton token={outputToken} side="output" />
                                 <div className="flex-1 min-w-0 text-right">
                                     {quoteLoading ? (
                                         <div className="flex items-center justify-end gap-2">
@@ -465,16 +481,13 @@ export default function SwapPage() {
                             <div className="flex items-center justify-between">
                                 <span className="text-sm text-zinc-400">Price Impact</span>
                                 <span className={`text-sm font-medium ${priceImpact > 1 ? "text-red-400" : "text-emerald-400"}`}>
-                                    {priceImpact < 0.01 ? "< 0.01%" : `${priceImpact.toFixed(2)}%`}
+                                    {Math.abs(priceImpact) < 0.01 ? "< 0.01%" : `${priceImpact.toFixed(2)}%`}
                                 </span>
                             </div>
                             <div className="flex items-center justify-between">
                                 <div className="flex items-center gap-2">
                                     <span className="text-sm text-zinc-400">Slippage</span>
-                                    <button
-                                        onClick={() => setShowSlippage(!showSlippage)}
-                                        className="text-zinc-600 hover:text-emerald-400 transition-colors"
-                                    >
+                                    <button onClick={() => setShowSlippage(!showSlippage)} className="text-zinc-600 hover:text-emerald-400 transition-colors">
                                         <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" /></svg>
                                     </button>
                                 </div>
@@ -485,8 +498,8 @@ export default function SwapPage() {
                                 <span className="text-sm text-zinc-300 font-medium capitalize">{order.swapType || "Aggregator"}</span>
                             </div>
                             <div className="flex items-center justify-between">
-                                <span className="text-sm text-zinc-400">Network Fee</span>
-                                <span className="text-sm text-zinc-300 font-medium">~$0.0001</span>
+                                <span className="text-sm text-zinc-400">Route</span>
+                                <span className="text-sm text-zinc-300 font-medium">{order.routePlan?.length || 1} hop(s)</span>
                             </div>
                         </div>
                     </div>
@@ -500,20 +513,10 @@ export default function SwapPage() {
                             <span className="text-xs text-emerald-400 font-bold">via Jupiter Ultra</span>
                         </div>
                         <div className="flex items-center justify-between">
-                            <p className="text-2xl md:text-3xl font-black text-white">
-                                {exchangeRate ? `$${exchangeRate}` : "—"}
-                            </p>
-                            {/* Mini visualization bars */}
+                            <p className="text-2xl md:text-3xl font-black text-white">{exchangeRate || "—"}</p>
                             <div className="flex items-end gap-[3px] h-10">
                                 {[40, 55, 35, 65, 50, 75, 60, 80, 70, 90, 85].map((h, i) => (
-                                    <div
-                                        key={i}
-                                        className="w-[5px] rounded-full transition-all"
-                                        style={{
-                                            height: `${h}%`,
-                                            background: i >= 8 ? "linear-gradient(to top, #9945FF, #14F195)" : "#1c1c2e"
-                                        }}
-                                    />
+                                    <div key={i} className="w-[5px] rounded-full transition-all" style={{ height: `${h}%`, background: i >= 8 ? "linear-gradient(to top, #9945FF, #14F195)" : "#1c1c2e" }} />
                                 ))}
                             </div>
                         </div>
@@ -523,13 +526,99 @@ export default function SwapPage() {
                     </div>
                 )}
 
-                {/* Desktop footer */}
                 <div className="hidden md:block mt-8 text-center">
-                    <p className="text-xs text-zinc-600">
-                        Powered by Jupiter Ultra • Best execution guaranteed
-                    </p>
+                    <p className="text-xs text-zinc-600">Powered by Jupiter Ultra • All Solana tokens supported</p>
                 </div>
             </main>
+
+            {/* TOKEN SELECTION MODAL */}
+            {tokenModal && (
+                <div className="fixed inset-0 z-[100] flex items-end md:items-center justify-center">
+                    {/* Backdrop */}
+                    <div className="absolute inset-0 bg-black/70 backdrop-blur-sm" onClick={() => setTokenModal(null)} />
+
+                    {/* Modal */}
+                    <div className="relative w-full max-w-md mx-auto bg-[#111119] border border-white/10 rounded-t-3xl md:rounded-3xl overflow-hidden shadow-2xl max-h-[80vh] flex flex-col" style={{ animation: "slideUp 0.3s ease" }}>
+                        {/* Header */}
+                        <div className="p-5 pb-0">
+                            <div className="flex items-center justify-between mb-4">
+                                <h2 className="font-black text-lg">Select Token</h2>
+                                <button onClick={() => setTokenModal(null)} className="w-8 h-8 rounded-full bg-white/5 flex items-center justify-center text-zinc-400 hover:text-white transition-colors">✕</button>
+                            </div>
+
+                            {/* Search Input */}
+                            <div className="relative mb-4">
+                                <svg className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-zinc-500" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" /></svg>
+                                <input
+                                    ref={searchRef}
+                                    type="text"
+                                    placeholder="Search name, symbol, or paste address..."
+                                    value={tokenSearch}
+                                    onChange={e => setTokenSearch(e.target.value)}
+                                    className="w-full pl-11 pr-4 py-3 bg-[#0a0a0f] border border-white/5 rounded-xl text-sm text-white placeholder-zinc-600 focus:outline-none focus:border-[#9945FF] transition-colors"
+                                />
+                            </div>
+                        </div>
+
+                        {/* Token List */}
+                        <div className="flex-1 overflow-y-auto px-2 pb-5" style={{ maxHeight: "50vh" }}>
+                            {/* Popular label */}
+                            {tokenSearch.length < 2 && (
+                                <p className="px-3 py-2 text-[10px] uppercase tracking-widest text-zinc-600 font-bold">Popular Tokens</p>
+                            )}
+
+                            {/* Loading */}
+                            {searchLoading && tokenSearch.length >= 2 && (
+                                <div className="flex items-center justify-center py-8">
+                                    <div className="w-6 h-6 border-2 border-[#9945FF] border-t-transparent rounded-full animate-spin" />
+                                </div>
+                            )}
+
+                            {/* No results */}
+                            {!searchLoading && tokenSearch.length >= 2 && searchResults.length === 0 && (
+                                <div className="text-center py-8">
+                                    <p className="text-zinc-500 text-sm">No tokens found</p>
+                                    <p className="text-zinc-600 text-xs mt-1">Try a different search term or paste a mint address</p>
+                                </div>
+                            )}
+
+                            {/* Token items */}
+                            {(!searchLoading || tokenSearch.length < 2) && displayedTokens.map(token => (
+                                <button
+                                    key={token.address}
+                                    onClick={() => selectToken(token)}
+                                    disabled={token.address === excludeMint}
+                                    className={`w-full flex items-center gap-3 px-3 py-3 rounded-xl text-left transition-colors ${
+                                        token.address === excludeMint
+                                            ? "opacity-30 cursor-not-allowed"
+                                            : "hover:bg-white/5"
+                                    }`}
+                                >
+                                    <TokenAvatar token={token} size="w-10 h-10" />
+                                    <div className="flex-1 min-w-0">
+                                        <div className="flex items-center gap-2">
+                                            <p className="font-bold text-white text-sm">{token.symbol}</p>
+                                            {token.tags?.includes("verified") && (
+                                                <span className="text-[9px] bg-emerald-400/10 text-emerald-400 px-1.5 py-0.5 rounded-full font-bold">✓</span>
+                                            )}
+                                        </div>
+                                        <p className="text-zinc-600 text-xs truncate">{token.name}</p>
+                                    </div>
+                                    <p className="text-zinc-600 text-[10px] font-mono truncate max-w-[80px]">{token.address.slice(0, 4)}...{token.address.slice(-4)}</p>
+                                </button>
+                            ))}
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* Slide-up animation */}
+            <style jsx>{`
+                @keyframes slideUp {
+                    from { transform: translateY(20px); opacity: 0; }
+                    to { transform: translateY(0); opacity: 1; }
+                }
+            `}</style>
 
             {/* Mobile Bottom Navigation */}
             <nav className="md:hidden fixed bottom-0 left-0 right-0 z-50 border-t border-white/5" style={{ background: "linear-gradient(180deg, #0d0d18 0%, #08080f 100%)" }}>
