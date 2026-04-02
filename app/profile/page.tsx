@@ -5,7 +5,7 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 
 export default function ProfilePage() {
-    const { publicKey, connected } = useWallet();
+    const { publicKey, connected, disconnect } = useWallet();
     const router = useRouter();
     const [loading, setLoading] = useState(true);
     const [isEditing, setIsEditing] = useState(false);
@@ -155,6 +155,12 @@ export default function ProfilePage() {
                                             className="px-4 py-2 bg-white/5 hover:bg-white/10 border border-white/10 rounded-xl text-sm font-semibold transition-colors"
                                         >
                                             Edit Profile
+                                        </button>
+                                        <button
+                                            onClick={() => disconnect()}
+                                            className="px-4 py-2 bg-red-500/10 hover:bg-red-500/20 text-red-400 border border-red-500/20 rounded-xl text-sm font-semibold transition-colors"
+                                        >
+                                            Exit
                                         </button>
                                     </div>
                                 </>
