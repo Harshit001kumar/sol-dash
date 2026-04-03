@@ -1,0 +1,220 @@
+[33mcommit 2b38892ae3f2757fa30dd1bd0c3a2f4713cdd7e4[m
+Author: Harshit <harshit@gmail.com>
+Date:   Thu Apr 2 11:32:01 2026 +0530
+
+    feat: add exit button in profile page
+
+[1mdiff --git a/next.config.ts b/next.config.ts[m
+[1mindex e9ffa30..c6f5737 100644[m
+[1m--- a/next.config.ts[m
+[1m+++ b/next.config.ts[m
+[36m@@ -1,7 +1,206 @@[m
+[31m-import type { NextConfig } from "next";[m
+[32m+[m[32mCRYPTO ESCROW / MIDDLEMAN DISCORD BOT DEVELOPMENT AGREEMENT[m
+ [m
+[31m-const nextConfig: NextConfig = {[m
+[31m-  /* config options here */[m
+[31m-};[m
+[32m+[m[32mThis Development Agreement (“Agreement”) is entered into on [Effective Date] by and between:[m
+ [m
+[31m-export default nextConfig;[m
+[32m+[m[32mDeveloper: Luffy {Dev}[m
+[32m+[m[32mClient: ___________________________[m
+[32m+[m
+[32m+[m[32mCollectively referred to as “Parties.”[m
+[32m+[m
+[32m+[m[32m1. Scope of Work[m
+[32m+[m
+[32m+[m[32mThe Developer agrees to design, develop, and deliver a Discord-based Crypto Escrow / Middleman (MM) Bot supporting:[m
+[32m+[m
+[32m+[m[32mLitecoin (LTC) transactions[m
+[32m+[m
+[32m+[m[32mSolana (SOL) transactions[m
+[32m+[m
+[32m+[m[32mEscrow transaction handling logic[m
+[32m+[m
+[32m+[m[32mAutomated transaction logging system[m
+[32m+[m
+[32m+[m[32mRole-based access controls (if requested)[m
+[32m+[m
+[32m+[m[32mAdministrative configuration tools[m
+[32m+[m
+[32m+[m[32mClient-defined escrow fee structure implementation[m
+[32m+[m
+[32m+[m[32mOnly features expressly agreed to in writing are included. Any additional features, upgrades, or integrations shall require a separate written agreement and may incur additional charges.[m
+[32m+[m
+[32m+[m[32m2. Fee Structure Configuration[m
+[32m+[m
+[32m+[m[32mThe Client shall provide clear written instructions for the escrow fee structure prior to deployment.[m
+[32m+[m
+[32m+[m[32mThe Developer will implement the fee logic exactly as instructed by the Client.[m
+[32m+[m
+[32m+[m[32mThe Developer shall not be responsible for:[m
+[32m+[m
+[32m+[m[32mIncorrect fee calculations resulting from inaccurate client instructions[m
+[32m+[m
+[32m+[m[32mFinancial losses caused by improper configuration[m
+[32m+[m
+[32m+[m[32mUser disputes related to fee policies[m
+[32m+[m
+[32m+[m[32mBusiness model viability or profitability[m
+[32m+[m
+[32m+[m[32m3. Compensation[m
+[32m+[m
+[32m+[m[32mTotal Development Fee: $25 USD (payable in cryptocurrency)[m
+[32m+[m
+[32m+[m[32mFull payment must be made before final delivery.[m
+[32m+[m
+[32m+[m[32mPayment is non-refundable once development has commenced.[m
+[32m+[m
+[32m+[m[32mCryptocurrency volatility, gas fees, and network fees are solely the Client’s responsibility.[m
+[32m+[m
+[32m+[m[32mNo chargebacks or disputes will be accepted after payment confirmation on the blockchain.[m
+[32m+[m
+[32m+[m[32m4. Delivery & Acceptance[m
+[32m+[m
+[32m+[m[32mDelivery will be provided via:[m
+[32m+[m
+[32m+[m[32mZIP file transfer, OR[m
+[32m+[m
+[32m+[m[32mGitHub repository ownership transfer[m
+[32m+[m
+[32m+[m[32mThe Client shall have 48 hours from delivery to report any critical functional defects.[m
+[32m+[m
+[32m+[m[32mFailure to report issues within 48 hours constitutes full acceptance of the product.[m
+[32m+[m
+[32m+[m[32mMinor cosmetic adjustments do not qualify as critical defects.[m
+[32m+[m
+[32m+[m[32m5. Intellectual Property[m
+[32m+[m
+[32m+[m[32mThe source code remains the sole intellectual property of the Developer.[m
+[32m+[m
+[32m+[m[32mThe Client is granted a non-exclusive, non-transferable, non-sublicensable license to use the bot.[m
+[32m+[m
+[32m+[m[32mThe Client may not:[m
+[32m+[m
+[32m+[m[32mResell the bot[m
+[32m+[m
+[32m+[m[32mRedistribute the source code[m
+[32m+[m
+[32m+[m[32mClaim ownership of the code[m
+[32m+[m
+[32m+[m[32mReverse engineer or modify the code for resale[m
+[32m+[m
+[32m+[m[32mViolation of this clause voids all support and licensing rights.[m
+[32m+[m
+[32m+[m[32m6. Warranty & Support[m
+[32m+[m
+[32m+[m[32mThe Developer provides:[m
+[32m+[m
+[32m+[m[32m30 days of limited technical support[m
+[32m+[m
+[32m+[m[32mBug fixes related only to agreed-upon features[m
+[32m+[m
+[32m+[m[32mSupport does NOT include:[m
+[32m+[m
+[32m+[m[32mNew feature development[m
+[32m+[m
+[32m+[m[32mThird-party API outages[m
+[32m+[m
+[32m+[m[32mBlockchain network failures[m
+[32m+[m
+[32m+[m[32mHosting mismanagement by the Client[m
+[32m+[m
+[32m+[m[32mUser misuse[m
+[32m+[m
+[32m+[m[32mAfter 30 days, support may be offered at a separate negotiated rate.[m
+[32m+[m
+[32m+[m[32m7. Optional Hosting Services[m
+[32m+[m
+[32m+[m[32mHosting services are optional and available at:[m
+[32m+[m
+[32m+[m[32m$10 USD per month (paid in crypto)[m
+[32m+[m
+[32m+[m[32mTerms:[m
+[32m+[m
+[32m+[m[32mPayment is due within the first 7 days of each month.[m
+[32m+[m
+[32m+[m[32mFailure to pay may result in immediate suspension.[m
+[32m+[m
+[32m+[m[32mData may be permanently deleted after 7 days of non-payment.[m
+[32m+[m
+[32m+[m[32mDeveloper is not liable for data loss after suspension.[m
+[32m+[m
+[32m+[m[32mif opted for hosting service the client will have to provide the bot tken and the necessary api key arequied for the bot[m[41m [m
+[32m+[m
+[32m+[m[32m8. Client Responsibilities[m
+[32m+[m
+[32m+[m[32mThe Client agrees to:[m
+[32m+[m
+[32m+[m[32mProvide a valid Discord bot token[m
+[32m+[m
+[32m+[m[32mProvide required API keys and wallet integrations[m
+[32m+[m
+[32m+[m[32mEnsure compliance with all applicable local and international laws[m
+[32m+[m
+[32m+[m[32mAssume full responsibility for all transactions processed through the bot[m
+[32m+[m
+[32m+[m[32mThe Developer is not responsible for how the bot is used.[m
+[32m+[m
+[32m+[m[32m9. Limitation of Liability[m
+[32m+[m
+[32m+[m[32mThe Developer shall not be liable for:[m
+[32m+[m
+[32m+[m[32mFinancial losses[m
+[32m+[m
+[32m+[m[32mEscrow disputes between users[m
+[32m+[m
+[32m+[m[32mBlockchain errors or delays[m
+[32m+[m
+[32m+[m[32mWallet malfunctions[m
+[32m+[m
+[32m+[m[32mHacking incidents[m
+[32m+[m
+[32m+[m[32mRegulatory penalties[m
+[32m+[m
+[32m+[m[32mBusiness losses[m
+[32m+[m
+[32m+[m[32mMaximum total liability under this Agreement shall not exceed $30 USD.[m
+[32m+[m
+[32m+[m[32m10. No Financial or Legal Advice[m
+[32m+[m
+[32m+[m[32mThe Developer does not provide financial, legal, or regulatory advice. The Client assumes all risk associated with operating a cryptocurrency escrow service.[m
+[32m+[m
+[32m+[m[32m11. Confidentiality[m
+[32m+[m
+[32m+[m[32mBoth Parties agree to maintain confidentiality of any proprietary or sensitive information exchanged during this Agreement.[m
+[32m+[m
+[32m+[m[32mThis obligation survives termination.[m
+[32m+[m
+[32m+[m[32m12. Termination[m
+[32m+[m
+[32m+[m[32mDeveloper may terminate hosting or support if payment terms are violated.[m
+[32m+[m
+[32m+[m[32mNo refunds shall be provided upon termination due to breach.[m
+[32m+[m
+[32m+[m[32mLicense automatically terminates upon violation of Intellectual Property terms.[m
+[32m+[m
+[32m+[m[32m13. Force Majeure[m
+[32m+[m
+[32m+[m[32mThe Developer shall not be liable for delays or failures caused by events beyond reasonable control, including but not limited to:[m
+[32m+[m
+[32m+[m[32mBlockchain network failures[m
+[32m+[m
+[32m+[m[32mAPI outages[m
+[32m+[m
+[32m+[m[32mGovernment restrictions[m
+[32m+[m
+[32m+[m[32mCyberattacks[m
+[32m+[m
+[32m+[m[32mNatural disasters[m
+[32m+[m
+[32m+[m[32m14. Entire Agreement[m
+[32m+[m
+[32m+[m[32mThis Agreement constitutes the entire understanding between the Parties.[m
+[32m+[m
+[32m+[m[32mAny amendments must be in writing and signed by both Parties.[m
+[32m+[m
+[32m+[m[32mDeveloper Signature: ___________________________[m
+[32m+[m
+[32m+[m[32mClient Signature: _
