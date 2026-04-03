@@ -11,17 +11,19 @@ interface SidebarProps {
         href: string;
         icon: React.ReactNode;
     }[];
+    isOpen?: boolean;
+    onClose?: () => void;
 }
 
-export default function Sidebar({ items }: SidebarProps) {
+export default function Sidebar({ items, isOpen = false, onClose }: SidebarProps) {
     const pathname = usePathname();
     const { publicKey, disconnect } = useWallet();
 
     return (
-        <aside className="fixed left-0 top-0 h-screen w-64 bg-[#0d0d12] border-r border-white/5 flex flex-col z-50">
+        <aside className={`fixed left-0 top-0 h-screen w-64 bg-[#0d0d12] border-r border-white/5 flex flex-col z-50 transition-transform duration-300 md:translate-x-0 ${isOpen ? 'translate-x-0' : '-translate-x-full'}`}>
             {/* Logo */}
-            <div className="p-6 border-b border-white/5">
-                <Link href="/" className="flex items-center gap-3">
+            <div className="p-6 border-b border-white/5 flex items-center justify-between">
+                <Link href="/" onClick={onClose} className="flex items-center gap-3">
                     <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-emerald-500 to-teal-500 flex items-center justify-center shadow-lg shadow-emerald-500/20">
                         <span className="text-xl">◎</span>
                     </div>
@@ -30,6 +32,10 @@ export default function Sidebar({ items }: SidebarProps) {
                         <p className="text-xs text-zinc-500">Mainnet Beta</p>
                     </div>
                 </Link>
+                {/* Mobile Close Button */}
+                <button className="md:hidden p-2 text-zinc-400 hover:text-white" onClick={onClose}>
+                    ✕
+                </button>
             </div>
 
             {/* Navigation */}
@@ -40,6 +46,7 @@ export default function Sidebar({ items }: SidebarProps) {
                         <Link
                             key={item.href}
                             href={item.href}
+                            onClick={onClose}
                             className={`flex items-center gap-3 px-4 py-3 rounded-xl font-medium transition-all duration-200 ${
                                 isActive
                                     ? "bg-emerald-500 text-black shadow-lg shadow-emerald-500/20"

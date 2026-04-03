@@ -32,6 +32,7 @@ export default function Home() {
   const [stats, setStats] = useState<Stats | null>(null);
   const [loading, setLoading] = useState(true);
   const [filter, setFilter] = useState<Filter>("all");
+  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
 
   useEffect(() => {
     fetch("/api/raffles")
@@ -91,16 +92,38 @@ export default function Home() {
           </div>
 
           {/* Right Side */}
-          <div className="flex items-center gap-4">
+          <div className="flex items-center gap-2 md:gap-4">
             {stats && (
               <div className="hidden md:flex items-center gap-2 px-3 py-1.5 bg-[#111117] rounded-lg border border-white/5">
                 <span className="text-emerald-400 font-bold text-sm">◎ {stats.totalRevenue.toFixed(1)}</span>
               </div>
             )}
             <WalletMultiButton />
+            <button 
+              className="md:hidden p-2 text-zinc-400 hover:text-white"
+              onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
+            >
+              <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                {isMobileMenuOpen ? (
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                ) : (
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
+                )}
+              </svg>
+            </button>
           </div>
         </div>
         
+        {/* Mobile Menu Overlay */}
+        {isMobileMenuOpen && (
+          <div className="md:hidden absolute top-16 left-0 w-full bg-[#0a0a0f] border-b border-white/5 flex flex-col p-4 gap-2 shadow-2xl">
+            <Link href="/" onClick={() => setIsMobileMenuOpen(false)} className="px-4 py-3 text-sm font-medium text-white bg-white/10 rounded-xl">Raffles</Link>
+            <Link href="/swap" onClick={() => setIsMobileMenuOpen(false)} className="px-4 py-3 text-sm font-medium text-zinc-400 hover:text-white rounded-xl">Swap</Link>
+            <Link href="/profile" onClick={() => setIsMobileMenuOpen(false)} className="px-4 py-3 text-sm font-medium text-zinc-400 hover:text-white rounded-xl">Profile</Link>
+            <Link href="/winners" onClick={() => setIsMobileMenuOpen(false)} className="px-4 py-3 text-sm font-medium text-zinc-400 hover:text-white rounded-xl">Winners</Link>
+          </div>
+        )}
+
         {/* Live Ticker */}
         <LiveTicker />
       </nav>
@@ -204,8 +227,8 @@ export default function Home() {
         )}
 
         {/* Filter Pills */}
-        <div className="flex flex-wrap items-center gap-4 mb-8">
-          <div className="pill-group">
+        <div className="flex flex-col md:flex-row md:items-center gap-4 mb-8">
+          <div className="pill-group flex-wrap md:flex-nowrap justify-start">
             <button 
               className={`pill ${filter === "all" ? "active" : ""}`}
               onClick={() => setFilter("all")}

@@ -18,6 +18,7 @@ interface Winner {
 export default function WinnersPage() {
   const [winners, setWinners] = useState<Winner[]>([]);
   const [loading, setLoading] = useState(true);
+  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
 
   useEffect(() => {
     fetch("/api/raffles?filter=winners")
@@ -59,8 +60,32 @@ export default function WinnersPage() {
             <Link href="/winners" className="px-4 py-2 text-sm font-medium text-white bg-white/10 rounded-lg">Winners</Link>
           </div>
 
-          <WalletMultiButton />
+          <div className="flex items-center gap-2 md:gap-4">
+            <WalletMultiButton />
+            <button 
+              className="md:hidden p-2 text-zinc-400 hover:text-white"
+              onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
+            >
+              <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                {isMobileMenuOpen ? (
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                ) : (
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
+                )}
+              </svg>
+            </button>
+          </div>
         </div>
+        
+        {/* Mobile Menu Overlay */}
+        {isMobileMenuOpen && (
+          <div className="md:hidden absolute top-16 left-0 w-full bg-[#0a0a0f] border-b border-white/5 flex flex-col p-4 gap-2 shadow-2xl">
+            <Link href="/" onClick={() => setIsMobileMenuOpen(false)} className="px-4 py-3 text-sm font-medium text-zinc-400 hover:text-white rounded-xl">Raffles</Link>
+            <Link href="/swap" onClick={() => setIsMobileMenuOpen(false)} className="px-4 py-3 text-sm font-medium text-zinc-400 hover:text-white rounded-xl">Swap</Link>
+            <Link href="/profile" onClick={() => setIsMobileMenuOpen(false)} className="px-4 py-3 text-sm font-medium text-zinc-400 hover:text-white rounded-xl">Profile</Link>
+            <Link href="/winners" onClick={() => setIsMobileMenuOpen(false)} className="px-4 py-3 text-sm font-medium text-white bg-white/10 rounded-xl">Winners</Link>
+          </div>
+        )}
       </nav>
 
       <main className="max-w-7xl mx-auto px-6 py-12">

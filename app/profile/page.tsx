@@ -168,7 +168,7 @@ export default function ProfilePage() {
                         </div>
 
                         {/* KPI Stats */}
-                        <div className="flex gap-6 text-center">
+                        <div className="flex flex-wrap justify-center gap-6 text-center mt-4 md:mt-0">
                             <div>
                                 <p className="text-3xl font-black text-emerald-400">◎ {profile.totalSpent.toFixed(2)}</p>
                                 <p className="text-xs text-zinc-500 uppercase tracking-wider">Total Spent</p>
