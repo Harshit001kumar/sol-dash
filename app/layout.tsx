@@ -5,6 +5,8 @@ import { WalletContextProvider } from "@/components/WalletProvider";
 import ChatWidget from "@/components/ChatWidget";
 import AirdropNotification from "@/components/AirdropNotification";
 import { Analytics } from "@vercel/analytics/next";
+import Script from "next/script";
+
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -95,6 +97,42 @@ export default function RootLayout({
           </div>
         </div>
         {/* END AADS AD UNIT 2433002 */}
+
+        {/* NEW AD UNITS */}
+        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '20px', padding: '20px 0' }}>
+          <div id="container-f26e4641c5527af64db017fe8656464e"></div>
+          <a 
+            href="https://www.profitablecpmratenetwork.com/v0pvqy488?key=7f3815d0bcd105593f825a7c893f3f84" 
+            target="_blank" 
+            rel="noopener noreferrer"
+            style={{ color: '#10b981', fontWeight: 'bold', fontSize: '14px', textDecoration: 'none' }}
+          >
+            🔥 Featured Promotion
+          </a>
+        </div>
+
+        {/* AD SCRIPTS */}
+        <Script src="https://pl29070239.profitablecpmratenetwork.com/80/ba/63/80ba6305775adc2e4d1874d4ab7c4769.js" strategy="afterInteractive" />
+        <Script 
+          src="https://pl29070240.profitablecpmratenetwork.com/f26e4641c5527af64db017fe8656464e/invoke.js" 
+          strategy="afterInteractive"
+          async
+          data-cfasync="false"
+        />
+        <Script id="atOptions-config" strategy="afterInteractive">
+          {`
+            atOptions = {
+              'key' : '862d4bbbf9118149565e3b6adb616efc',
+              'format' : 'iframe',
+              'height' : 300,
+              'width' : 160,
+              'params' : {}
+            };
+          `}
+        </Script>
+        <Script src="https://www.highperformanceformat.com/862d4bbbf9118149565e3b6adb616efc/invoke.js" strategy="afterInteractive" />
+        <Script src="https://pl29070241.profitablecpmratenetwork.com/f4/a6/73/f4a673e6c7a8a44b6eb45bd0044f0e20.js" strategy="afterInteractive" />
+
       </body>
     </html>
   );
